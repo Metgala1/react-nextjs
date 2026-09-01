@@ -1,21 +1,16 @@
 import { getProducts } from '@/sevices/product.service';
-import Link from 'next/link';
 import ProductCard from '@/components/ProductsCard';
+import { Product } from '@/data/products';
 
-interface Product {
-    id: number;
-    name: string;
-    price: number;
-    category: string;
-    rating: number;
-    reviewsCount: number;
-    description: string;
-    specs: string[];
-    image: string;
+type Props = {
+    searchParams: Promise<{search?: string}>
 }
 
-export default async function ProductsPage() {
+export default async function ProductsPage({searchParams}: Props) {
     const products: Product[] = await getProducts()
+    const {search} = await searchParams
+    const searchTerm = search?.toLowerCase() ?? ''
+    const filteredProduct = products.filter((prod) => prod.name.toLowerCase().includes(searchTerm))
     return (
         <main className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-6xl">
@@ -33,13 +28,13 @@ export default async function ProductsPage() {
                         </p>
                     </div>
                     <div className="mt-4 md:mt-0 text-sm text-slate-500 font-medium">
-                        Showing <span className="text-slate-900 font-bold">{products.length}</span> results
+                        Showing <span className="text-slate-900 font-bold">{filteredProduct.length}</span> results
                     </div>
                 </div>
 
                 {/* Product Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {products.map((product) => (
+                    {filteredProduct.map((product) => (
                         <ProductCard key={product.id} product={product}/>
                     ))}
                 </div>

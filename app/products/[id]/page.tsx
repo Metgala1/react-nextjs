@@ -1,5 +1,7 @@
-import { getProductById, getProducts } from "@/sevices/product.service";
+// app/products/[id]/page.tsx (Server Component)
+import { getProductById } from "@/sevices/product.service";
 import { notFound } from "next/navigation";
+import AddToCartSection from "@/components/AddToCartSection";
 
 type Props = {
     params: Promise<{id: string}>
@@ -10,23 +12,8 @@ export default async function ProductDetail({params}: Props) {
     
     const product = await getProductById(Number(id))
 
-
-
     if (!product) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-                <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
-                    <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
-                        !
-                    </div>
-                    <h1 className="text-xl font-semibold text-slate-900 mb-2">Product Not Found</h1>
-                    <p className="text-slate-600 text-sm mb-6">The product you are looking for might have been removed or does not exist.</p>
-                    <a href="/" className="inline-block bg-slate-900 text-white font-medium text-sm px-6 py-2.5 rounded-xl hover:bg-slate-800 transition-colors">
-                        Back to Home
-                    </a>
-                </div>
-            </div>
-        );
+        notFound()
     }
 
     return (
@@ -78,14 +65,8 @@ export default async function ProductDetail({params}: Props) {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-4">
-                            <button className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm py-3 px-6 rounded-xl shadow-sm transition-colors cursor-pointer">
-                                Add to Cart
-                            </button>
-                            <button className="px-5 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-sm rounded-xl transition-colors cursor-pointer">
-                                Save
-                            </button>
-                        </div>
+                        {/* Interactive Client Component for Quantity & Cart Actions */}
+                        <AddToCartSection productId={product.id} />
                     </div>
                 </div>
             </div>

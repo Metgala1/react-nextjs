@@ -32,6 +32,9 @@ export default function ProductCard({ product }: { product: Product }) {
                     <p className="text-slate-600 text-xs line-clamp-2 leading-relaxed mb-4">
                         {product.description}
                     </p>
+                    <div className="text-xs text-slate-500 font-medium">
+                        Stock Quantity: <span className="text-slate-900 font-bold">{product.quantity}</span>
+                    </div>
                 </div>
             </div>
 
