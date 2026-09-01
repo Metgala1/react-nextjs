@@ -1,78 +1,15 @@
 // components/CreateProductForm.tsx
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { addProduct } from "@/sevices/product.service";
-import { Product, products } from "@/data/products";
-
-interface CreateProduct {
-    name: string;
-    price: number;
-    category: string;
-    rating: number;
-    reviewsCount: number; // Changed from reviewCount to reviewsCount
-    description: string;
-    specInput: string;
-    image: string;
-    quantity: number;
-}
-
+import { useTransition } from "react";
+import { createProduct } from "@/actions/products.action";
 
 export default function CreateProductForm() {
-    const router = useRouter();
-    const [isLoading, setIsLoading] = useState(false);
+    const [isPending ] = useTransition()
 
-    const [formData, setFormData] = useState<CreateProduct>({
-        name: "",
-        price: 0,
-        category: "Laptops",
-        rating: 5.0,
-        reviewsCount: 0,
-        description: "",
-        specInput: "",
-        image: "",
-        quantity: 0
-    });
-
-    function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
-        const { name, value } = e.target;
-        
-        setFormData((prev) => ({
-            ...prev,
-            [name]: name === "price" || name === "rating" || name === "reviewCount" || name === "quantity" 
-                ? Number(value) 
-                : value
-        }));
-    }
-
-    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-        e.preventDefault();
-        setIsLoading(true);
-
-        const newProduct = {
-            id: products.length + 1,
-            name: formData.name,
-            price: formData.price,
-            category: formData.category,
-            rating: formData.rating,
-            reviewsCount: formData.reviewsCount,
-            description: formData.description,
-            specs: formData.specInput.split(",").map((s) => s.trim()).filter(Boolean),
-            image: formData.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80",
-            quantity: formData.quantity
-        };
-
-        // Save through the product service layer utilizing localStorage
-        await addProduct(newProduct);
-
-        setIsLoading(false);
-        router.push("/products");
-        router.refresh();
-    }
 
     return (
-        <form onSubmit={handleSubmit} className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-8 max-w-2xl mx-auto space-y-6">
+        <form action={createProduct}  className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-8 max-w-2xl mx-auto space-y-6">
             <div>
                 <h2 className="text-xl font-bold text-slate-900 mb-1">Add New Product</h2>
                 <p className="text-sm text-slate-500">Fill out the details below to add a new item to the store catalog.</p>
@@ -86,8 +23,6 @@ export default function CreateProductForm() {
                         type="text" 
                         name="name"
                         required
-                        value={formData.name}
-                        onChange={handleChange}
                         placeholder="e.g. Studio Display" 
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     />
@@ -101,8 +36,7 @@ export default function CreateProductForm() {
                         name="price"
                         required
                         min="0"
-                        value={formData.price}
-                        onChange={handleChange}
+                        defaultValue={0}
                         placeholder="1299" 
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     />
@@ -115,8 +49,7 @@ export default function CreateProductForm() {
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Category</label>
                     <select 
                         name="category"
-                        value={formData.category}
-                        onChange={handleChange}
+                        defaultValue="Laptops"
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     >
                         <option value="Laptops">Laptops</option>
@@ -140,8 +73,7 @@ export default function CreateProductForm() {
                         step="0.1" 
                         min="1" 
                         max="5"
-                        value={formData.rating}
-                        onChange={handleChange}
+                        defaultValue={5.0}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     />
                 </div>
@@ -153,8 +85,7 @@ export default function CreateProductForm() {
                         type="number" 
                         name="reviewsCount"
                         min="0"
-                        value={formData.reviewsCount}
-                        onChange={handleChange}
+                        defaultValue={0}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     />
                 </div>
@@ -167,8 +98,6 @@ export default function CreateProductForm() {
                     name="description"
                     rows={3}
                     required
-                    value={formData.description}
-                    onChange={handleChange}
                     placeholder="Provide a comprehensive product description..."
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                 />
@@ -180,8 +109,6 @@ export default function CreateProductForm() {
                 <input 
                     type="text" 
                     name="specInput"
-                    value={formData.specInput}
-                    onChange={handleChange}
                     placeholder="Retina Display, M2 Chip, 8GB RAM"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                 />
@@ -193,8 +120,6 @@ export default function CreateProductForm() {
                 <input 
                     type="url" 
                     name="image"
-                    value={formData.image}
-                    onChange={handleChange}
                     placeholder="https://images.unsplash.com/..."
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                 />
@@ -203,10 +128,10 @@ export default function CreateProductForm() {
             {/* Submit Button */}
             <button 
                 type="submit" 
-                disabled={isLoading}
+                disabled={isPending}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm py-3.5 rounded-xl shadow-sm transition-colors cursor-pointer disabled:opacity-50"
             >
-                {isLoading ? "Publishing Product..." : "Publish Product"}
+                {isPending ? "Publishing Product..." : "Publish Product"}
             </button>
         </form>
     );
