@@ -1,19 +1,42 @@
-// app/products/[id]/page.tsx (Server Component)
+"use client";
+
 import { getProductById } from "@/sevices/product.service";
 import { notFound } from "next/navigation";
 import AddToCartSection from "@/components/AddToCartSection";
+import { useEffect, useState, use } from "react";
+import { Product } from "@/data/products";
 
 type Props = {
     params: Promise<{id: string}>
 }
 
-export default async function ProductDetail({params}: Props) {
-    const {id} = await params
+export default function ProductDetail({ params }: Props) {
+    const { id } = use(params);
     
-    const product = await getProductById(Number(id))
+    const [product, setProduct] = useState<Product | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        async function loadProduct() {
+            const foundProduct = await getProductById(Number(id));
+            if (foundProduct) {
+                setProduct(foundProduct);
+            }
+            setIsLoading(false);
+        }
+        loadProduct();
+    }, [id]);
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-slate-50 py-12 px-4 flex items-center justify-center">
+                <div className="text-slate-500 text-sm font-medium">Loading product details...</div>
+            </div>
+        );
+    }
 
     if (!product) {
-        notFound()
+        notFound();
     }
 
     return (

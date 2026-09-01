@@ -11,7 +11,8 @@ export default function Header() {
     const links = [
         { href: "/", text: "Home" },
         { href: "/products", text: "Products" },
-        { href: "/about", text: "About" }
+        { href: "/about", text: "About" },
+        {href: "/products/new" , text: "Create Product"}
     ];
 
     return (
@@ -36,7 +37,7 @@ export default function Header() {
                             <Link 
                                 key={link.text}
                                 href={link.href} 
-                                className={`px-4 py-2 text-sm font-medium rounded-xl transition-colors ${
+                                className={`px-1 py-2 text-sm font-medium rounded-xl transition-colors ${
                                     isActive 
                                         ? "text-indigo-600 bg-indigo-50 font-semibold" 
                                         : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
