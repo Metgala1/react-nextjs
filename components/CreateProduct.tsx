@@ -1,19 +1,33 @@
-// components/CreateProductForm.tsx
 "use client";
 
-import { useTransition } from "react";
-import { createProduct } from "@/actions/products.action";
+import { createProduct, type CreateProductState } from "@/actions/products.action";
+import { useActionState } from "react";
+import SubmitButton from "./SubmitButton";
+
+const initialState: CreateProductState = {
+    success: false,
+    message: ""
+}
 
 export default function CreateProductForm() {
-    const [isPending ] = useTransition()
-
+    const [state, formAction] = useActionState(
+        createProduct,
+        initialState
+    );
 
     return (
-        <form action={createProduct}  className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-8 max-w-2xl mx-auto space-y-6">
+        <form action={formAction} className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-8 max-w-2xl mx-auto space-y-6">
             <div>
                 <h2 className="text-xl font-bold text-slate-900 mb-1">Add New Product</h2>
                 <p className="text-sm text-slate-500">Fill out the details below to add a new item to the store catalog.</p>
             </div>
+
+            {/* General Feedback Message */}
+            {state.message && (
+                <div className={`p-4 rounded-xl text-sm font-medium ${state.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
+                    {state.message}
+                </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Product Name */}
@@ -22,10 +36,12 @@ export default function CreateProductForm() {
                     <input 
                         type="text" 
                         name="name"
-                        required
                         placeholder="e.g. Studio Display" 
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     />
+                    {state.errors?.name && (
+                        <p className="mt-1 text-xs text-rose-600">{state.errors.name[0]}</p>
+                    )}
                 </div>
 
                 {/* Price */}
@@ -34,12 +50,14 @@ export default function CreateProductForm() {
                     <input 
                         type="number" 
                         name="price"
-                        required
                         min="0"
                         defaultValue={0}
                         placeholder="1299" 
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     />
+                    {state.errors?.price && (
+                        <p className="mt-1 text-xs text-rose-600">{state.errors.price[0]}</p>
+                    )}
                 </div>
             </div>
 
@@ -62,6 +80,9 @@ export default function CreateProductForm() {
                         <option value="Cameras">Cameras</option>
                         <option value="Drones">Drones</option>
                     </select>
+                    {state.errors?.category && (
+                        <p className="mt-1 text-xs text-rose-600">{state.errors.category[0]}</p>
+                    )}
                 </div>
 
                 {/* Rating */}
@@ -76,6 +97,9 @@ export default function CreateProductForm() {
                         defaultValue={5.0}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     />
+                    {state.errors?.rating && (
+                        <p className="mt-1 text-xs text-rose-600">{state.errors.rating[0]}</p>
+                    )}
                 </div>
 
                 {/* Review Count */}
@@ -88,6 +112,9 @@ export default function CreateProductForm() {
                         defaultValue={0}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     />
+                    {state.errors?.reviewsCount && (
+                        <p className="mt-1 text-xs text-rose-600">{state.errors.reviewsCount[0]}</p>
+                    )}
                 </div>
             </div>
 
@@ -97,10 +124,12 @@ export default function CreateProductForm() {
                 <textarea 
                     name="description"
                     rows={3}
-                    required
                     placeholder="Provide a comprehensive product description..."
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                 />
+                {state.errors?.description && (
+                    <p className="mt-1 text-xs text-rose-600">{state.errors.description[0]}</p>
+                )}
             </div>
 
             {/* Specifications Input */}
@@ -112,6 +141,9 @@ export default function CreateProductForm() {
                     placeholder="Retina Display, M2 Chip, 8GB RAM"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                 />
+                {state.errors?.specs && (
+                    <p className="mt-1 text-xs text-rose-600">{state.errors.specs[0]}</p>
+                )}
             </div>
 
             {/* Image URL */}
@@ -123,16 +155,13 @@ export default function CreateProductForm() {
                     placeholder="https://images.unsplash.com/..."
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                 />
+                {state.errors?.image && (
+                    <p className="mt-1 text-xs text-rose-600">{state.errors.image[0]}</p>
+                )}
             </div>
 
             {/* Submit Button */}
-            <button 
-                type="submit" 
-                disabled={isPending}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm py-3.5 rounded-xl shadow-sm transition-colors cursor-pointer disabled:opacity-50"
-            >
-                {isPending ? "Publishing Product..." : "Publish Product"}
-            </button>
+            <SubmitButton />
         </form>
     );
 }
