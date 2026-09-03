@@ -1,38 +1,62 @@
 // services/product.service.ts
-import { products as initialProducts, Product } from "@/data/products";
+import { prisma } from "@/lib/prisma"
+
+export interface Product {
+    id: number;
+    name: string;
+    price: number;
+    category: string;
+    rating: number;
+    reviewsCount: number;
+    description: string;
+    specs: string[];
+    image: string;
+    quantity: number;
+}
+
+export interface CreateProduct {
+    name: string;
+    price: number;
+    category: string;
+    rating: number;
+    reviewsCount: number;
+    description: string;
+    specs: string[];
+    image: string;
+    quantity: number;
+
+}
 
 export async function getProducts(): Promise<Product[]> {
-    if (typeof window === "undefined") {
-        return initialProducts;
-    }
+    return await prisma.product.findMany({
+        select: {
+            id: true,
+            name: true,
+            price: true,
+            category: true,
+            rating: true,
+            reviewsCount: true,
+            description: true,
+            specs: true,
+            image: true,
+            quantity: true
 
-    const saved = localStorage.getItem("store_products");
-    if (!saved) {
-        localStorage.setItem("store_products", JSON.stringify(initialProducts));
-        return initialProducts;
-    }
-
-    try {
-        const parsed = JSON.parse(saved);
-        // Ensure it's valid and contains items
-        if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
+        },
+        orderBy: {
+            createdAt: "desc"
         }
-    } catch (e) {
-        console.error("Failed to parse store_products from localStorage", e);
-    }
-
-    localStorage.setItem("store_products", JSON.stringify(initialProducts));
-    return initialProducts;
+    });
 }
 
-export async function getProductById(id: number): Promise<Product | undefined> {
-    const allProducts = await getProducts();
-    return allProducts.find((p) => p.id === id);
+export async function getProductById(id: number): Promise<Product | null> {
+    return await prisma.product.findUnique({
+        where: { id },
+    });
 }
 
-export async function addProduct(newProduct: Product) {
-    const allProducts = await getProducts();
-    const updatedProducts = [newProduct, ...allProducts];
-    localStorage.setItem("store_products", JSON.stringify(updatedProducts));
+export async function addProduct(newProduct: CreateProduct) {
+    return await prisma.product.create({
+        data: newProduct,
+    });
+    
 }

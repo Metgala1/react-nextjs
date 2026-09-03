@@ -11,7 +11,7 @@ export interface Product {
     quantity: number;
 }
 
-export const products: Product[] = [
+export const products = [
     {
         id: 1,
         name: "Macbook Pro 16\"",

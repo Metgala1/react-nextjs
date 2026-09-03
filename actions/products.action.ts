@@ -1,9 +1,9 @@
 // actions/products.action.ts
 "use server";
-
 import { addProduct } from "@/sevices/product.service";
-import { redirect } from "next/navigation";
 import { createProductSchema } from "@/validation/product";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 export type CreateProductState = {
   success: boolean
@@ -45,17 +45,22 @@ export async function createProduct(previousState: CreateProductState, formData:
         };
     }
 
-    const newProduct = {
-        ...result.data,
-        id: Date.now(),
-    };
+    try{
+             const newProduct = {
+             ...result.data,
+            };
+            await addProduct(newProduct);
 
-    await addProduct(newProduct);
-
-    return {
-        success: true,
-        message: "Product created successfully"
+    }catch(err) {
+        console.error(err)
+        return {
+        success: false,
+        message: "Something went wrong while creating product"
     }
+
+    }
+    revalidatePath("/products")
+    redirect("/products")
 
     
 }
