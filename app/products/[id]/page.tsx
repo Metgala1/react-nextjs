@@ -1,14 +1,37 @@
 import { getProductById } from "@/sevices/product.service";
 import { notFound } from "next/navigation";
 import AddToCartSection from "@/components/AddToCartSection";
-import { revalidatePath } from "next/cache";
+import type { Metadata } from "next";
 
 type Props = {
     params: Promise<{ id: string }>;
 };
 
+// SEO generation for products details ppage 
+export async function generateMetadata({params,}: Props): Promise<Metadata> {
+  const { id } = await params
+
+  const productId = Number(id)
+  const product = await getProductById(productId)
+
+  if (!product) {
+    return {
+      title: "Product Not Found",
+    }
+  }
+
+  return {
+    title: `${product.name} | StoreFront`,
+    description: `Buy ${product.name} from StoreFront.`,
+  }
+}
+
 export default async function ProductDetail({ params }: Props) {
     const { id } = await params;
+
+    if(Number.isNaN(Number(id))) {
+        notFound()
+    }
 
     const product = await getProductById(Number(id));
 

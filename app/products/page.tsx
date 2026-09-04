@@ -1,8 +1,13 @@
 import { getProducts } from "@/sevices/product.service";
 import ProductCard from "@/components/ProductsCard";
 
-export default async function ProductsPage() {
-    const products = await getProducts();
+interface searchParams {
+    searchParams: Promise<{search?: string , category?: string}>
+}
+
+export default async function ProductsPage({searchParams} : searchParams) {
+    const {search , category} = await searchParams
+    const products = await getProducts(search, category);
 
     return (
         <main className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">

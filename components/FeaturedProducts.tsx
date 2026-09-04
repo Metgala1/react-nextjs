@@ -1,9 +1,10 @@
 // components/home/FeaturedProducts.tsx
-import { products } from "@/data/products";
 import ProductCard from "./ProductsCard";
 import Link from "next/link";
+import { getProducts } from "@/sevices/product.service";
 
-export default function FeaturedProducts() {
+export default async function FeaturedProducts() {
+    const products = await getProducts()
     const featured = products.slice(0, 3);
 
     return (

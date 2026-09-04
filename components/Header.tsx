@@ -23,7 +23,7 @@ export default function Header() {
                     href="/" 
                     className="text-lg font-extrabold text-slate-900 tracking-tight hover:text-indigo-600 transition-colors shrink-0"
                 >
-                    Store<span className="text-indigo-600">Front</span>
+                    Store<span className="text-blue-600">Front</span>
                 </Link>
 
                 {/* Search Bar */}

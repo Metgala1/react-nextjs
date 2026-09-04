@@ -45,7 +45,7 @@ export default function AddToCartSection({ productId }: { productId: number }) {
             <div className="flex items-center gap-4">
                 <button 
                     onClick={handleAddToCart}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm py-3 px-6 rounded-xl shadow-sm transition-colors cursor-pointer"
+                    className="flex-1 bg-black hover:bg-green-500 hover:text-black text-white font-medium text-sm py-3 px-6 rounded-xl shadow-sm transition-colors cursor-pointer"
                 >
                     Add to Cart
                 </button>

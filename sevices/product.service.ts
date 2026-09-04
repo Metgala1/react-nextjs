@@ -27,8 +27,27 @@ export interface CreateProduct {
 
 }
 
-export async function getProducts(): Promise<Product[]> {
+export async function getProducts(search?: string, query?: string): Promise<Product[]> {
+    const searchTerm = query || search;
+    await new Promise((resolve) => setTimeout(resolve , 5000))
+
     return await prisma.product.findMany({
+        where: searchTerm ? {
+            OR: [
+                {
+                    name: {
+                        contains: searchTerm,
+                        mode: "insensitive", // Fixed typo: "insesitive" -> "insensitive"
+                    },
+                },
+                {
+                    category: {
+                        contains: searchTerm,
+                        mode: "insensitive",
+                    },
+                },
+            ],
+        } : undefined,
         select: {
             id: true,
             name: true,
@@ -39,16 +58,19 @@ export async function getProducts(): Promise<Product[]> {
             description: true,
             specs: true,
             image: true,
-            quantity: true
-
+            quantity: true,
+            createdAt: true,
+            updatedAt: true,
         },
         orderBy: {
-            createdAt: "desc"
-        }
+            createdAt: "desc",
+        },
     });
 }
 
+
 export async function getProductById(id: number): Promise<Product | null> {
+    await new Promise((resolve) => setTimeout(resolve , 5000))
     return await prisma.product.findUnique({
         where: { id },
     });
