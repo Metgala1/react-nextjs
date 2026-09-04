@@ -1,12 +1,26 @@
 // components/home/FeaturedProducts.tsx
+"use server"
+
 import ProductCard from "./ProductsCard";
 import Link from "next/link";
-import { getProducts } from "@/sevices/product.service";
+import { getFeaturedProducts } from "@/sevices/product.service";
+import { Suspense } from "react";
+import ProductCardSkeleton from "./ProductCardSkeleton";
+
+// Separate the data-fetching part into its own async sub-component
+async function ProductGrid() {
+    const featured = await getFeaturedProducts();
+
+    return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {featured.map((product) => (
+                <ProductCard key={product.id} product={product} />
+            ))}
+        </div>
+    );
+}
 
 export default async function FeaturedProducts() {
-    const products = await getProducts()
-    const featured = products.slice(0, 3);
-
     return (
         <section className="py-20 bg-slate-50">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -20,11 +34,16 @@ export default async function FeaturedProducts() {
                     </Link>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {featured.map((product) => (
-                        <ProductCard key={product.id} product={product} />
-                    ))}
-                </div>
+                {/* Suspense handles the loading state for the entire grid */}
+                <Suspense fallback={
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {[...Array(3)].map((_, i) => (
+                            <ProductCardSkeleton key={i} />
+                        ))}
+                    </div>
+                }>
+                    <ProductGrid />
+                </Suspense>
             </div>
         </section>
     );

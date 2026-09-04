@@ -29,7 +29,7 @@ export interface CreateProduct {
 
 export async function getProducts(search?: string, query?: string): Promise<Product[]> {
     const searchTerm = query || search;
-    await new Promise((resolve) => setTimeout(resolve , 5000))
+    await new Promise((resolve) => setTimeout(resolve , 3000))
 
     return await prisma.product.findMany({
         where: searchTerm ? {
@@ -70,7 +70,7 @@ export async function getProducts(search?: string, query?: string): Promise<Prod
 
 
 export async function getProductById(id: number): Promise<Product | null> {
-    await new Promise((resolve) => setTimeout(resolve , 5000))
+    await new Promise((resolve) => setTimeout(resolve , 3000))
     return await prisma.product.findUnique({
         where: { id },
     });
@@ -81,4 +81,11 @@ export async function addProduct(newProduct: CreateProduct) {
         data: newProduct,
     });
     
+}
+
+export async function getFeaturedProducts() {
+    await new Promise((resolve) => setTimeout(resolve , 3000))
+    return await prisma.product.findMany({
+        take: 4
+    })
 }
