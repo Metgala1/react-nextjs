@@ -12,4 +12,19 @@ export const createProductSchema = z.object({
     quantity: z.coerce.number().min(0, "Quantity cannot be negative"),
 });
 
+
+export const signupSchema = z.object({
+  name: z
+    .string()
+    .min(2, { message: "Name must be at least 2 characters long" }),
+  email: z
+    .email({ message: "Please enter a valid email address" }),
+  password: z
+    .string()
+    .min(8, { message: "Password must be at least 6 characters long" }),
+});
+
+export type SignupInput = z.infer<typeof signupSchema>;
+
+
 export type CreateProductInput = z.infer<typeof createProductSchema>;

@@ -12,7 +12,8 @@ export default function Header() {
         { href: "/", text: "Home" },
         { href: "/products", text: "Products" },
         { href: "/about", text: "About" },
-        {href: "/products/new" , text: "Create Product"}
+        {href: "/products/new" , text: "Create"},
+        {href: "/dashboard", text: "Dashboard"}
     ];
 
     return (
