@@ -1,9 +1,9 @@
-import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
+import { requireAdmin } from "@/lib/auth";
 
 export default async function DashboardPage() {
-  const session = await getSession();
+  const session = await requireAdmin();
 
   if (!session) {
     redirect("/auth/login");
@@ -19,7 +19,7 @@ export default async function DashboardPage() {
           </span>
 
           <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-            Welcome back, Admin
+            Welcome back , {session.user.name}
           </h1>
 
           <p className="mt-2 max-w-xl text-sm text-indigo-100">

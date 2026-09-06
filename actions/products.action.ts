@@ -4,6 +4,7 @@ import { addProduct } from "@/sevices/product.service";
 import { createProductSchema } from "@/validation/product";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { getSession } from "@/lib/auth";
 
 export type CreateProductState = {
   success: boolean
@@ -24,6 +25,15 @@ export type CreateProductState = {
 export async function createProduct(previousState: CreateProductState, formData: FormData): Promise<CreateProductState> {
     const specInput = (formData.get("specInput") as string) || "";
     const specs = specInput.split(",").map((s) => s.trim()).filter(Boolean);
+
+    const session = await getSession()
+
+    if (!session) {
+    return {
+        success: false,
+        message: "Authentication required",
+        }
+        }
 
     const result = createProductSchema.safeParse({
         name: formData.get("name"),

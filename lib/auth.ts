@@ -1,6 +1,7 @@
 import crypto from "crypto"
 import {prisma} from "@/lib/prisma"
 import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
 
 export async function createSession(userId: number) {
     const sessionId = crypto.randomBytes(32).toString("hex")
@@ -36,8 +37,17 @@ export async function getSession() {
         where: {
             id: sessionId
         },
-        include: {
-            user: true
+        select: {
+            id: true,
+            expiresAt: true,
+            user: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    UserRole: true
+                }
+            }
         }
     })
 
@@ -46,9 +56,38 @@ export async function getSession() {
     }
 
     if(session.expiresAt < new Date()) {
+        await prisma.session.delete({
+            where: {
+                id: session.id
+            }
+        })
         return null
     }
 
     return session
 
+}
+
+export async function requireAdmin() {
+    const session = await getSession()
+
+    if(!session) {
+       redirect("/auth/login")
+    }
+
+    if(session.user.UserRole !== "ADMIN") {
+        return null
+    }
+
+    return session
+}
+
+export async function requireAuth() {
+    const session = await getSession()
+
+    if(!session) {
+        redirect("/auth/login")
+    }
+
+    return session
 }

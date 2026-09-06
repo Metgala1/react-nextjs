@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import SearchBar from "./SearchBar";
 
-export default function Header() {
+export default  function Header() {
     const pathname = usePathname();
 
     const links = [
@@ -13,7 +13,7 @@ export default function Header() {
         { href: "/products", text: "Products" },
         { href: "/about", text: "About" },
         {href: "/products/new" , text: "Create"},
-        {href: "/dashboard", text: "Dashboard"}
+        {href: "/dashboard", text: "Dashboard"},
     ];
 
     return (

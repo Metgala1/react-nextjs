@@ -1,6 +1,7 @@
+import { requireAdmin } from "@/lib/auth";
 import Link from "next/link";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
   analytics,
   orders,
@@ -9,6 +10,15 @@ export default function DashboardLayout({
   analytics: React.ReactNode
   orders: React.ReactNode
 }) {
+  const session = await requireAdmin()
+  const name = session?.user?.name ?? ""
+  const fristName = name.split(" ")[0] ?? ""
+  const secondName = name.split(" ")[1] ?? ""
+
+  const firstLetter = fristName.charAt(0)
+  const secondLetter = secondName.charAt(0)
+
+  const abrev = firstLetter + secondLetter || undefined
   return (
     <div className="min-h-screen bg-slate-100/60">
       
@@ -33,7 +43,7 @@ export default function DashboardLayout({
 
           <div className="flex items-center space-x-3">
             <div className="w-9 h-9 bg-slate-200 rounded-full border-2 border-white shadow-xs overflow-hidden flex items-center justify-center text-xs font-bold text-slate-600">
-              AD
+              {abrev}
             </div>
           </div>
         </div>

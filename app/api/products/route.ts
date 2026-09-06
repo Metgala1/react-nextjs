@@ -1,3 +1,4 @@
+import { getSession } from "@/lib/auth";
 import {prisma} from "@/lib/prisma"
 import { createProductSchema } from "@/schema/products.schema"
 import { createProduct } from "@/sevices/product.service"
@@ -47,6 +48,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     const body = await request.json()
+    const session = await getSession()
 
     const result = createProductSchema.safeParse(body)
 
@@ -59,6 +61,19 @@ export async function POST(request: Request) {
             status: 400
         }
     )
+    }
+    if(!session) {
+        return Response.json({
+            status: 401,
+            message: "Authentication required"
+        })
+    }
+
+    if(session.user.UserRole !== "ADMIN") {
+        return Response.json({
+            status: 403,
+            message: "Forbidden"
+        })
     }
 
     const product = await createProduct(result.data)

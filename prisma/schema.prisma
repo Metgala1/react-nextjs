@@ -29,11 +29,17 @@ model Product {
   updatedAt    DateTime @updatedAt
 }
 
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   name         String
   email        String   @unique
   passwordHash String
+  UserRole     UserRole @default(CUSTOMER)
 
   sessions     Session[]
 
