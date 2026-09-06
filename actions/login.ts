@@ -4,10 +4,12 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcrypt";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { cookies } from "next/headers";
+import { createSession } from "@/lib/auth";
 
 const loginSchema = z.object({
     email: z.string().email({ message: "Please enter a valid email address" }),
-    password: z.string().min(1, { message: "Password is required" }),
+    password: z.string().min(8, { message: "Password is required" }),
 });
 
 export type LoginState = {
@@ -52,6 +54,17 @@ export async function loginUser(prevState: LoginState, formData: FormData): Prom
             message: "Invalid email or password.",
         };
     }
+
+    const sessionId = await createSession(user.id)
+
+    const cookieStore = await cookies()
+
+    cookieStore.set("session", sessionId , {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/"
+    })
 
     redirect("/");
 }

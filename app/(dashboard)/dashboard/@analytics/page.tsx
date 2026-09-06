@@ -35,7 +35,7 @@ export default function AnalyticsPage() {
   ];
 
   const recentActivity = [
-    { id: 1, customer: "Alex Morgan", item: "Wireless Noise-Canceling Headphones", amount: "$299.00", status: "Completed", time: "10 minutes ago" },
+    { id: 1, customer: "Alex Morgan", item: "Wireless Noise-Canceling Headphones", amount: "$293.00", status: "Completed", time: "10 minutes ago" },
     { id: 2, customer: "Sarah Jenkins", item: "Ergonomic Mechanical Keyboard", amount: "$149.50", status: "Processing", time: "45 minutes ago" },
     { id: 3, customer: "David Chen", item: "Ultra-Wide 4K Monitor", amount: "$699.00", status: "Completed", time: "2 hours ago" },
     { id: 4, customer: "Elena Rostova", item: "USB-C Hub Multiport Adapter", amount: "$45.00", status: "Shipped", time: "3 hours ago" },
