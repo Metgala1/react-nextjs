@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getFeaturedProducts } from "@/sevices/product.service";
 import { Suspense } from "react";
 import ProductCardSkeleton from "./ProductCardSkeleton";
+import { products } from "@/data/products";
 
 // Separate the data-fetching part into its own async sub-component
 async function ProductGrid() {
@@ -14,7 +15,10 @@ async function ProductGrid() {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {featured.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard
+                    key={product.id}
+                    product={{ ...product, category: product.category?.name ?? "" }}
+                />
             ))}
         </div>
     );

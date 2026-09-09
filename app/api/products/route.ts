@@ -1,8 +1,9 @@
-import { getSession } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import {prisma} from "@/lib/prisma"
 import { createProductSchema } from "@/schema/products.schema"
 import { createProduct } from "@/sevices/product.service"
-import { getProducts } from "@/sevices/product.service"
+import { hasPermission } from "@/lib/permissions";
+
 
 import { NextResponse } from "next/server";
 
@@ -48,7 +49,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     const body = await request.json()
-    const session = await getSession()
+    const user = await getCurrentUser()
+
+
 
     const result = createProductSchema.safeParse(body)
 
@@ -62,14 +65,14 @@ export async function POST(request: Request) {
         }
     )
     }
-    if(!session) {
+    if(!user) {
         return Response.json({
             status: 401,
             message: "Authentication required"
         })
     }
 
-    if(session.user.UserRole !== "ADMIN") {
+    if(!hasPermission(user.UserRole , "products:create")) {
         return Response.json({
             status: 403,
             message: "Forbidden"

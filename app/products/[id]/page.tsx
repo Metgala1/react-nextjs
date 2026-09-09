@@ -53,7 +53,7 @@ export default async function ProductDetail({ params }: Props) {
                         />
 
                         <span className="absolute top-6 left-6 bg-white/90 backdrop-blur-md text-slate-800 text-xs font-semibold px-3 py-1.5 rounded-full shadow-xs">
-                            {product.category}
+                            {product.category?.name}
                         </span>
                     </div>
 

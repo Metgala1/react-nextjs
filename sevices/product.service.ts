@@ -1,17 +1,24 @@
 // services/product.service.ts
-import { prisma } from "@/lib/prisma"
+import { prisma } from "@/lib/prisma";
 
 export interface Product {
     id: number;
     name: string;
     price: number;
-    category: string;
+    categoryId: number;
+    category?: {
+        id: number;
+        name: string;
+        slug: string;
+    };
     rating: number;
     reviewsCount: number;
     description: string;
     specs: string[];
     image: string;
     quantity: number;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 export interface CreateProduct {
@@ -24,43 +31,62 @@ export interface CreateProduct {
     specs: string[];
     image: string;
     quantity: number;
-
 }
 
-export async function getProducts(search?: string, query?: string): Promise<Product[]> {
-    const searchTerm = query || search;
-    await new Promise((resolve) => setTimeout(resolve , 1000))
+export async function getProducts(search?: string, category?: string, page?: string) {
+    const pageSize = 9; // Number of items per page
+    const currentPage = Number(page) || 1;
+    const skip = (currentPage - 1) * pageSize;
 
-    return await prisma.product.findMany({
-        where: searchTerm ? {
-            OR: [
-                {
-                    name: {
-                        contains: searchTerm,
-                        mode: "insensitive", // Fixed typo: "insesitive" -> "insensitive"
-                    },
-                },
-                {
-                    category: {
-                        contains: searchTerm,
-                        mode: "insensitive",
-                    },
-                },
-            ],
-        } : undefined,
-        select: {
-            id: true,
-            name: true,
-            price: true,
+    const whereClause = {
+        ...(search ? {
+            name: {
+                contains: search,
+                mode: "insensitive" as const
+            }
+        } : {}),
+        ...(category ? {
+            category: {
+                name: category,
+            }
+        } : {})
+    };
+
+    // Fetch products and total count concurrently
+    const [products, totalCount] = await Promise.all([
+        prisma.product.findMany({
+            where: whereClause,
+            skip,
+            take: pageSize,
+            include: { category: true } // Ensure category relation is included if needed
+        }),
+        prisma.product.count({ where: whereClause })
+    ]);
+
+    return {
+        products,
+        totalPages: Math.ceil(totalCount / pageSize),
+        currentPage
+    };
+}
+
+
+export async function getProductById(id: number): Promise<Product | null> {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return await prisma.product.findUnique({
+        where: { id },
+        include: {
             category: true,
-            rating: true,
-            reviewsCount: true,
-            description: true,
-            specs: true,
-            image: true,
-            quantity: true,
-            createdAt: true,
-            updatedAt: true,
+        },
+    });
+}
+
+export async function getFeaturedProducts(): Promise<Product[]> {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return await prisma.product.findMany({
+        take: 4,
+        include: {
+            category: true,
         },
         orderBy: {
             createdAt: "desc",
@@ -68,31 +94,41 @@ export async function getProducts(search?: string, query?: string): Promise<Prod
     });
 }
 
+export async function createProduct(productData: CreateProduct): Promise<Product> {
+    const { category: categoryName, ...rest } = productData;
+    const categorySlug = categoryName.toLowerCase().replace(/\s+/g, "-");
 
-export async function getProductById(id: number): Promise<Product | null> {
-    await new Promise((resolve) => setTimeout(resolve , 1000))
-    return await prisma.product.findUnique({
-        where: { id },
+    const categoryRecord = await prisma.category.upsert({
+        where: { slug: categorySlug },
+        update: {},
+        create: {
+            name: categoryName,
+            slug: categorySlug,
+        },
+    });
+
+    return await prisma.product.create({
+        data: {
+            ...rest,
+            categoryId: categoryRecord.id,
+        },
+        include: {
+            category: true,
+        },
     });
 }
 
-export async function addProduct(newProduct: CreateProduct) {
-    return await prisma.product.create({
-        data: newProduct,
-    });
-    
+export async function addProduct(productData: CreateProduct): Promise<Product> {
+    return createProduct(productData);
 }
 
-export async function getFeaturedProducts() {
-    await new Promise((resolve) => setTimeout(resolve , 1000))
-    return await prisma.product.findMany({
-        take: 4
+export async function getCategories() {
+    return prisma.category.findMany({
+        select: {
+            id: true,
+            name: true,
+            slug: true
+        }
     })
 }
 
-export async function createProduct(product: CreateProduct):Promise<Product> {
-    return await prisma.product.create({
-        data: product
-    })
-
-}

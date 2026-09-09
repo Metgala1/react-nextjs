@@ -91,3 +91,32 @@ export async function requireAuth() {
 
     return session
 }
+
+export async function getCurrentUser() {
+    const session = await getSession()
+
+    return session?.user ?? null
+}
+
+
+import {
+  hasPermission,
+  type Permission,
+} from "@/lib/permissions"
+
+export async function requirePermission(
+  permission: Permission
+) {
+  const session = await requireAuth()
+
+  if (
+    !hasPermission(
+      session.user.UserRole,
+      permission
+    )
+  ) {
+    throw new Error("Forbidden")
+  }
+
+  return session
+}

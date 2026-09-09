@@ -14,6 +14,9 @@ export default async function ProductModal({ params }: Props) {
     where: {
       id: productId
     },
+    include: {
+      category: true
+    }
   });
 
   if (!product) {
@@ -35,7 +38,7 @@ export default async function ProductModal({ params }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4">
           <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-600">
-            {product.category}
+            {product.category.name}
           </span>
 
           <ModalClose

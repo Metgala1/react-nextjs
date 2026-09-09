@@ -5,6 +5,7 @@ import { createProductSchema } from "@/validation/product";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 
 export type CreateProductState = {
   success: boolean
@@ -34,6 +35,16 @@ export async function createProduct(previousState: CreateProductState, formData:
         message: "Authentication required",
         }
         }
+    
+    if(!hasPermission(
+        session.user.UserRole,
+        "products:create"
+    )){
+        return {
+            success: false,
+            message: "You don't have permission to create products"
+        }
+    }
 
     const result = createProductSchema.safeParse({
         name: formData.get("name"),

@@ -42,7 +42,7 @@ export default function TestApi() {
             {products.map((prod) => (
                 <div key={prod.id}>
                 <p>{prod.name}</p>
-                <p>{prod.category}</p>
+                <p>{prod.category?.name}</p>
                 <p>{prod.price}</p>
                 </div>
             ))}

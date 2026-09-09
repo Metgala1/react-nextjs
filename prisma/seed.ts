@@ -2,7 +2,7 @@ import { PrismaClient } from "../app/generated/prisma/client";
 
 const prisma = new PrismaClient();
 
-const products = [
+const rawProducts = [
     {
         name: 'Macbook Pro 16"',
         price: 2499,
@@ -188,17 +188,41 @@ const products = [
 async function main() {
     console.log("🌱 Starting seed...");
 
-    // Clear existing products
+    // Clear existing records safely (products depend on categories)
     await prisma.product.deleteMany();
+    await prisma.category.deleteMany();
 
-    console.log("🗑️ Existing products deleted.");
+    console.log("🗑️ Existing products and categories cleared.");
+
+    // Extract unique categories and build seed data with slugs
+    const uniqueCategoryNames = Array.from(new Set(rawProducts.map((p) => p.category)));
+    
+    const categoryRecords = await Promise.all(
+        uniqueCategoryNames.map((name) =>
+            prisma.category.create({
+                data: {
+                    name,
+                    slug: name.toLowerCase().replace(/\s+/g, "-"),
+                },
+            })
+        )
+    );
+
+    // Create a map to lookup category IDs by name
+    const categoryMap = new Map(categoryRecords.map((cat) => [cat.name, cat.id]));
+
+    // Map raw products to reference categoryId instead of category string
+    const formattedProducts = rawProducts.map(({ category, ...product }) => ({
+        ...product,
+        categoryId: categoryMap.get(category)!,
+    }));
 
     // Insert products
     await prisma.product.createMany({
-        data: products,
+        data: formattedProducts,
     });
 
-    console.log(`✅ Seeded ${products.length} products.`);
+    console.log(`✅ Seeded ${categoryRecords.length} categories and ${formattedProducts.length} products.`);
 }
 
 main()
