@@ -34,7 +34,7 @@ export interface CreateProduct {
 }
 
 export async function getProducts(search?: string, category?: string, page?: string) {
-    const pageSize = 9; // Number of items per page
+    const pageSize = 4
     const currentPage = Number(page) || 1;
     const skip = (currentPage - 1) * pageSize;
 
@@ -71,14 +71,20 @@ export async function getProducts(search?: string, category?: string, page?: str
 }
 
 
-export async function getProductById(id: number): Promise<Product | null> {
+export async function getProductById(id: number): Promise<Product> {
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    return await prisma.product.findUnique({
+    const product = await prisma.product.findUnique({
         where: { id },
         include: {
             category: true,
         },
     });
+
+    if (!product) {
+        throw new Error(`Product with id ${id} not found`);
+    }
+
+    return product;
 }
 
 export async function getFeaturedProducts(): Promise<Product[]> {

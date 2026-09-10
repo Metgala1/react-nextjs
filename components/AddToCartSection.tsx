@@ -2,9 +2,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/router";
 
 export default function AddToCartSection({ productId }: { productId: number }) {
     const [quantity, setQuantity] = useState(1);
+    const router = useRouter()
+       
 
     const handleDecrement = () => {
         setQuantity((prev) => (prev > 1 ? prev - 1 : 1));
@@ -17,7 +20,7 @@ export default function AddToCartSection({ productId }: { productId: number }) {
     const handleAddToCart = () => {
         // Handle your add to cart logic here (e.g., state management, API call)
         console.log(`Added product ${productId} with quantity ${quantity} to cart`);
-    };
+    };    
 
     return (
         <div className="space-y-4">
@@ -49,8 +52,8 @@ export default function AddToCartSection({ productId }: { productId: number }) {
                 >
                     Add to Cart
                 </button>
-                <button className="px-5 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-sm rounded-xl transition-colors cursor-pointer">
-                    Save
+                <button onClick={() =>  router.push(`/products/${productId}/edit`) } className="px-5 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-sm rounded-xl transition-colors cursor-pointer">
+                    Edit
                 </button>
             </div>
         </div>

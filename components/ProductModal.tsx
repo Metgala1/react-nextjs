@@ -36,7 +36,7 @@ export default async function ProductModal({
         {/* Modal Header Bar */}
         <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
-            {product.category}
+            {product.ca}
           </span>
 
           <Link

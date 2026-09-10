@@ -3,6 +3,12 @@ import ProductCard from "@/components/ProductsCard";
 import { Suspense } from "react";
 import ProductCardSkeleton from "@/components/ProductCardSkeleton";
 import PaginationBar from "@/components/PaginationBar";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+    title: "Products | StoreFront",
+    description: "Explore and discover our variety of products"
+}
 
 interface SearchParamsProps {
     searchParams: Promise<{ search?: string; category?: string; page?: string }>;
@@ -67,7 +73,7 @@ export default async function ProductsPage({ searchParams }: SearchParamsProps) 
                     </div>
 
                     <div className="mt-4 md:mt-0 text-sm text-slate-500 font-medium">
-                        Catalog Results
+                       Page {currentPage} / {totalPages}
                     </div>
                 </div>
 
