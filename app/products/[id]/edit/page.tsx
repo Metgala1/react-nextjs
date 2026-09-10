@@ -1,8 +1,8 @@
-
 import EditProductForm from "@/components/EditProductForm"
 import { getSession } from "@/lib/auth"
 import { getProductById } from "@/sevices/product.service"
 import { redirect } from "next/navigation"
+import notFound from "../../not-found"
 
 export interface Product {
     id: number;
@@ -23,25 +23,34 @@ export interface Product {
     createdAt: Date;
     updatedAt: Date;
 }
-export default async function EditProductPage({params} :{params: Promise<{id: string}>}) {
-    const id = (await params).id
-    const productId = Number(id)
 
-    const product: Product  = await getProductById(productId)
+export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
+    const productId = Number(id);
 
-    const session = await getSession()
+    const session = await getSession();
 
+    if (!session) {
+        redirect("/auth/login");
+    }
 
-  if(!session) {
-    redirect("/auth/login")
-  }
-  return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
-      <h1 className="mb-8 text-3xl font-bold">
-        Create Product
-      </h1>
+    if (Number.isNaN(productId)) {
+        notFound();
+    }
 
-      <EditProductForm {...product} />
-    </main>
-  )
+    const product: Product = await getProductById(productId);
+
+    if (!product) {
+        notFound();
+    }
+
+    return (
+        <main className="mx-auto max-w-2xl px-6 py-10">
+            <h1 className="mb-8 text-3xl font-bold">
+                Edit Product
+            </h1>
+
+            <EditProductForm product={product} />
+        </main>
+    );
 }

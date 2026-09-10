@@ -138,3 +138,11 @@ export async function getCategories() {
     })
 }
 
+export async function updateProducts(id: number , product: Product) {
+    await prisma.product.updateMany({
+        where: { id },
+        data: [
+            product
+        ]
+    })
+}

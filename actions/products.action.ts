@@ -1,11 +1,12 @@
 // actions/products.action.ts
 "use server";
-import { addProduct } from "@/sevices/product.service";
+import { addProduct , updateProducts} from "@/sevices/product.service";
 import { createProductSchema , updateProductSchema} from "@/validation/product";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
 
 export type CreateProductState = {
   success: boolean
@@ -89,7 +90,7 @@ export async function createProduct(previousState: CreateProductState, formData:
 export type UpdateProductState = {
     success: boolean,
     message: string,
-    error?: {
+    errors?: {
         name?: string[]
         price?: string[]
         category?: string[]
@@ -102,27 +103,32 @@ export type UpdateProductState = {
     }
 }
 
-export async function updateProduct(previousState: UpdateProductState, formData: FormData): Promise<CreateProductState> {
+// actions/products.action.ts
+export async function updateProduct(id: number, prevState: any, formData: FormData): Promise<UpdateProductState> {
     const specInput = (formData.get("specInput") as string) || "";
     const specs = specInput.split(",").map((s) => s.trim()).filter(Boolean);
 
-    const session = await getSession()
-
-    if (!session) {
-    return {
-        success: false,
-        message: "Authentication required",
-        }
-        }
-    
-    if(!hasPermission(
-        session.user.UserRole,
-        "products:create"
-    )){
+    if (!Number.isInteger(id) || id <= 0) {
         return {
             success: false,
-            message: "You don't have permission to create products"
-        }
+            message: "Invalid product ID",
+        };
+    }
+
+    const session = await getSession();
+
+    if (!session) {
+        return {
+            success: false,
+            message: "Authentication required",
+        };
+    }
+    
+    if (!hasPermission(session.user.UserRole, "products:update")) {
+        return {
+            success: false,
+            message: "You don't have permission to update products"
+        };
     }
 
     const result = updateProductSchema.safeParse({
@@ -134,7 +140,7 @@ export async function updateProduct(previousState: UpdateProductState, formData:
         description: formData.get("description"),
         specs: specs,
         image: formData.get("image") || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80",
-        quantity: formData.get("quantity") || 0
+        quantity: formData.get("quantity")
     });
 
     if (!result.success) {
@@ -145,22 +151,22 @@ export async function updateProduct(previousState: UpdateProductState, formData:
         };
     }
 
-    try{
-             const newProduct = {
-             ...result.data,
-            };
-            await addProduct(newProduct);
+    const data = result.data;
+    const { category, ...productData } = data;
 
-    }catch(err) {
-        console.error(err)
-        return {
-        success: false,
-        message: "Something went wrong while creating product"
-    }
+    await prisma.product.update({
+        where: { id },
+        data: {
+            ...productData,
+            category: {
+                connect: { name: category }
+            }
+        }
+    });
 
-    }
-    revalidatePath("/products")
-    redirect("/products")
+    revalidatePath(`/products`);
+    revalidatePath(`/products/${id}`);
 
-    
+    redirect(`/products/${id}`);
 }
+

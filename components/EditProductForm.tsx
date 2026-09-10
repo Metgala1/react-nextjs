@@ -1,8 +1,9 @@
+// components/EditProductForm.tsx
 "use client";
 
-// import { updateProduct, type UpdateProductState } from "@/actions/products.action";
-// import { useActionState } from "react";
-import SubmitButton from "@/components/SubmitButton";
+import { useActionState } from "react";
+import SubmitButton from "./SubmitButton";
+import { updateProduct } from "@/actions/products.action";
 
 export interface Product {
     id: number;
@@ -24,27 +25,33 @@ export interface Product {
     updatedAt: Date;
 }
 
-// const initialState: UpdateProductState = {
-//     success: false,
-//     message: ""
-// };
+interface EditProductFormProps {
+    product: Product;
+}
 
-export default function EditProductForm( product : Product) {
-    
+const initialState = {
+    success: false,
+    message: "",
+    errors: {},
+};
 
+export default function EditProductForm({ product }: EditProductFormProps) {
+    const updateProductWithId = updateProduct.bind(null, product.id);
+    const [state, formAction] = useActionState(updateProductWithId, initialState);
+   
     return (
-        <form  className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-8 max-w-2xl mx-auto space-y-6">
+        <form action={formAction} className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-8 max-w-2xl mx-auto space-y-6">
             <div>
                 <h2 className="text-xl font-bold text-slate-900 mb-1">Edit Product</h2>
                 <p className="text-sm text-slate-500">Update the details below to modify the item in the store catalog.</p>
             </div>
 
             {/* General Feedback Message */}
-            {/* {state.message && (
+            {state.message && (
                 <div className={`p-4 rounded-xl text-sm font-medium ${state.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
                     {state.message}
                 </div>
-            )} */}
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Product Name */}
@@ -57,9 +64,9 @@ export default function EditProductForm( product : Product) {
                         placeholder="e.g. Studio Display" 
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     />
-                    {/* {state.errors?.name && (
+                    {state.errors?.name && (
                         <p className="mt-1 text-xs text-rose-600">{state.errors.name[0]}</p>
-                    )} */}
+                    )}
                 </div>
 
                 {/* Price */}
@@ -69,13 +76,14 @@ export default function EditProductForm( product : Product) {
                         type="number" 
                         name="price"
                         min="0"
+                        step="0.01"
                         defaultValue={product.price}
                         placeholder="1299" 
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     />
-                    {/* {state.errors?.price && (
+                    {state.errors?.price && (
                         <p className="mt-1 text-xs text-rose-600">{state.errors.price[0]}</p>
-                    )} */}
+                    )}
                 </div>
             </div>
 
@@ -98,9 +106,9 @@ export default function EditProductForm( product : Product) {
                         <option value="Cameras">Cameras</option>
                         <option value="Drones">Drones</option>
                     </select>
-                    {/* {state.errors?.category && (
+                    {state.errors?.category && (
                         <p className="mt-1 text-xs text-rose-600">{state.errors.category[0]}</p>
-                    )} */}
+                    )}
                 </div>
 
                 {/* Rating */}
@@ -115,9 +123,9 @@ export default function EditProductForm( product : Product) {
                         defaultValue={product.rating ?? 5.0}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     />
-                    {/* {state.errors?.rating && (
+                    {state.errors?.rating && (
                         <p className="mt-1 text-xs text-rose-600">{state.errors.rating[0]}</p>
-                    )} */}
+                    )}
                 </div>
 
                 {/* Review Count */}
@@ -130,9 +138,41 @@ export default function EditProductForm( product : Product) {
                         defaultValue={product.reviewsCount ?? 0}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                     />
-                    {/* {state.errors?.reviewsCount && (
+                    {state.errors?.reviewsCount && (
                         <p className="mt-1 text-xs text-rose-600">{state.errors.reviewsCount[0]}</p>
-                    )} */}
+                    )}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Quantity */}
+                <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Quantity in Stock</label>
+                    <input 
+                        type="number" 
+                        name="quantity"
+                        min="0"
+                        defaultValue={product.quantity ?? 0}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                    />
+                    {state.errors?.quantity && (
+                        <p className="mt-1 text-xs text-rose-600">{state.errors.quantity[0]}</p>
+                    )}
+                </div>
+
+                {/* Image URL */}
+                <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Image URL</label>
+                    <input 
+                        type="url" 
+                        name="image"
+                        defaultValue={product.image ?? ""}
+                        placeholder="https://images.unsplash.com/..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                    />
+                    {state.errors?.image && (
+                        <p className="mt-1 text-xs text-rose-600">{state.errors.image[0]}</p>
+                    )}
                 </div>
             </div>
 
@@ -146,9 +186,9 @@ export default function EditProductForm( product : Product) {
                     placeholder="Provide a comprehensive product description..."
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                 />
-                {/* {state.errors?.description && (
+                {state.errors?.description && (
                     <p className="mt-1 text-xs text-rose-600">{state.errors.description[0]}</p>
-                )} */}
+                )}
             </div>
 
             {/* Specifications Input */}
@@ -161,24 +201,9 @@ export default function EditProductForm( product : Product) {
                     placeholder="Retina Display, M2 Chip, 8GB RAM"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                 />
-                {/* {state.errors?.specs && (
+                {state.errors?.specs && (
                     <p className="mt-1 text-xs text-rose-600">{state.errors.specs[0]}</p>
-                )} */}
-            </div>
-
-            {/* Image URL */}
-            <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Image URL</label>
-                <input 
-                    type="url" 
-                    name="image"
-                    defaultValue={product.image ?? ""}
-                    placeholder="https://images.unsplash.com/..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
-                />
-                {/* {state.errors?.image && (
-                    <p className="mt-1 text-xs text-rose-600">{state.errors.image[0]}</p>
-                )} */}
+                )}
             </div>
 
             {/* Submit Button */}
