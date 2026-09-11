@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import ModalClose from "@/components/ModalClose";
 
 type Props = {
@@ -8,19 +9,32 @@ type Props = {
 
 export default async function ProductModal({ params }: Props) {
   const { id } = await params;
-  const productId = Number(id)
+  const productId = Number(id);
 
   const product = await prisma.product.findUnique({
     where: {
-      id: productId
+      id: productId,
     },
     include: {
-      category: true
-    }
+      category: true,
+    },
   });
 
   if (!product) {
     notFound();
+  }
+
+  async function deleteProduct() {
+    "use server";
+    
+    await prisma.product.delete({
+      where: {
+        id: productId,
+      },
+    });
+
+    revalidatePath("/products");
+    redirect("/products");
   }
 
   return (
@@ -121,17 +135,28 @@ export default async function ProductModal({ params }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end space-x-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
-          <ModalClose className="rounded-xl px-5 py-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200/60">
-            Back to Catalog
-          </ModalClose>
+        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-4">
+          <form action={deleteProduct}>
+            <button
+              type="submit"
+              className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-2.5 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-100"
+            >
+              Delete Product
+            </button>
+          </form>
 
-          <button
-            type="button"
-            className="rounded-xl bg-indigo-600 px-6 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
-          >
-            Add to Cart
-          </button>
+          <div className="flex items-center space-x-3">
+            <ModalClose className="rounded-xl px-5 py-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200/60">
+              Back to Catalog
+            </ModalClose>
+
+            <button
+              type="button"
+              className="rounded-xl bg-indigo-600 px-6 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+            >
+              Add to Cart
+            </button>
+          </div>
         </div>
       </div>
     </div>
