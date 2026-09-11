@@ -1,7 +1,9 @@
 import { getProductById } from "@/sevices/product.service";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import AddToCartSection from "@/components/AddToCartSection";
 import type { Metadata } from "next";
+import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
 
 type Props = {
     params: Promise<{ id: string }>;
@@ -37,6 +39,18 @@ export default async function ProductDetail({ params }: Props) {
 
     if (!product) {
         notFound();
+    }
+   
+    async function deleteProduct() {
+        "use server"
+        await prisma.product.delete({
+            where: {
+                id: product.id
+            }
+        })
+
+        revalidatePath("/products")
+        redirect("/products")
     }
 
     return (
@@ -105,7 +119,7 @@ export default async function ProductDetail({ params }: Props) {
                         </div>
 
                         {/* Client Component */}
-                        <AddToCartSection productId={product.id} />
+                        <AddToCartSection onDelete={deleteProduct} productId={product.id} />
                     </div>
                 </div>
             </div>

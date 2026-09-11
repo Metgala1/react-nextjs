@@ -41,7 +41,7 @@ model User {
   name         String
   email        String   @unique
   passwordHash String
-  UserRole     UserRole @default(CUSTOMER)
+  UserRole     UserRole @default(ADMIN)
 
   sessions     Session[]
 
