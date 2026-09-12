@@ -2,8 +2,7 @@ import { getProductById } from "@/sevices/product.service";
 import { notFound, redirect } from "next/navigation";
 import AddToCartSection from "@/components/AddToCartSection";
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { deleteProduct } from "@/actions/products.action";
 
 type Props = {
     params: Promise<{ id: string }>;
@@ -12,6 +11,7 @@ type Props = {
 // SEO generation for products details ppage 
 export async function generateMetadata({params,}: Props): Promise<Metadata> {
   const { id } = await params
+  
 
   const productId = Number(id)
   const product = await getProductById(productId)
@@ -40,18 +40,10 @@ export default async function ProductDetail({ params }: Props) {
     if (!product) {
         notFound();
     }
-   
-    async function deleteProduct() {
-        "use server"
-        await prisma.product.delete({
-            where: {
-                id: product.id
-            }
-        })
 
-        revalidatePath("/products")
-        redirect("/products")
-    }
+    const deleteProd = deleteProduct.bind(null, product.id);
+   
+   
 
     return (
         <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -119,7 +111,7 @@ export default async function ProductDetail({ params }: Props) {
                         </div>
 
                         {/* Client Component */}
-                        <AddToCartSection onDelete={deleteProduct} productId={product.id} />
+                        <AddToCartSection onDelete={deleteProd} productId={product.id} />
                     </div>
                 </div>
             </div>

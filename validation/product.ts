@@ -8,7 +8,9 @@ export const createProductSchema = z.object({
     reviewsCount: z.coerce.number().min(0, "Review count cannot be negative"),
     description: z.string().trim().min(10, "Description must be at least 10 characters long"),
     specs: z.array(z.string()).min(1, "At least one specification is required"),
-    image: z.string().trim().url("Must be a valid image URL"),
+    image: z.instanceof(File, { message: "Must be a valid image file" })
+        .refine((file) => file.size > 0, "Image file cannot be empty")
+        .refine((file) => file.type.startsWith("image/"), "File must be an image"),
     quantity: z.coerce.number().min(0, "Quantity cannot be negative"),
 });
 

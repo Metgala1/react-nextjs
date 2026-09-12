@@ -150,8 +150,9 @@ export default function CreateProductForm() {
             <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Image URL</label>
                 <input 
-                    type="url" 
+                    type="file" 
                     name="image"
+                    accept="image/jpeg,image/png,image/webp"
                     placeholder="https://images.unsplash.com/..."
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                 />

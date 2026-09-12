@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase/server";
 
 export type CreateProductState = {
   success: boolean
@@ -107,6 +108,61 @@ export type UpdateProductState = {
 export async function updateProduct(id: number, prevState: any, formData: FormData): Promise<UpdateProductState> {
     const specInput = (formData.get("specInput") as string) || "";
     const specs = specInput.split(",").map((s) => s.trim()).filter(Boolean);
+    const image = formData.get("image")
+
+    if(!(image instanceof File)) {
+        return {
+            success: false,
+            message: "Product image is requires"
+        }
+    }
+
+    const allowedTypes = [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    ]
+
+    const maxSize = 5 * 1024 * 1024
+
+    if(!allowedTypes.includes(image.type)) {
+        return {
+            success: false,
+            message: "Only JPG, PNG , WebP images are allowed",
+        }
+    }
+
+    if(image.size > maxSize) {
+        return {
+            success: false,
+            message: "Image must be smaller than 5mb"
+        }
+    }
+
+    const extension = image.name.split(".").pop() || "jpg"
+    const fileName = `${crypto.randomUUID()}.${extension}`
+    const filePath = `products/${fileName}`
+
+    const supabase = await createClient()
+    const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("products")
+        .upload(filePath, image, {
+            contentType: image.type,
+            upsert: false
+        })
+
+    if (uploadError) {
+        console.error(uploadError)
+
+        return {
+            success: false,
+            message: "Failed to upload product image"
+        }
+    }
+        
+    
+       
+
 
     if (!Number.isInteger(id) || id <= 0) {
         return {
@@ -139,7 +195,7 @@ export async function updateProduct(id: number, prevState: any, formData: FormDa
         reviewsCount: formData.get("reviewsCount"),
         description: formData.get("description"),
         specs: specs,
-        image: formData.get("image") || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80",
+        image: uploadData.path,
         quantity: formData.get("quantity")
     });
 
@@ -170,3 +226,13 @@ export async function updateProduct(id: number, prevState: any, formData: FormDa
     redirect(`/products/${id}`);
 }
 
+export async function deleteProduct(id: number) {
+    await prisma.product.delete({
+        where: {
+            id
+        }
+    })
+
+    revalidatePath("/products")
+    redirect("/products")
+}

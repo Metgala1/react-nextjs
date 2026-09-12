@@ -73,13 +73,14 @@ export default function AddToCartSection({ productId, onDelete }: AddToCartSecti
                     Edit
                 </Link>
                 {onDelete && (
+                    <form action={handleDelete}>
                     <button 
-                        onClick={handleDelete}
                         disabled={isPending}
                         className="px-4 py-3 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 font-medium text-sm rounded-xl transition-colors cursor-pointer disabled:opacity-50"
                     >
                         {isPending ? "Deleting..." : "Delete"}
                     </button>
+                    </form>
                 )}
             </div>
         </div>
