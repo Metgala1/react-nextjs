@@ -8,9 +8,9 @@ export const createProductSchema = z.object({
     reviewsCount: z.coerce.number().min(0, "Review count cannot be negative"),
     description: z.string().trim().min(10, "Description must be at least 10 characters long"),
     specs: z.array(z.string()).min(1, "At least one specification is required"),
-    image: z.instanceof(File, { message: "Must be a valid image file" })
-        .refine((file) => file.size > 0, "Image file cannot be empty")
-        .refine((file) => file.type.startsWith("image/"), "File must be an image"),
+    // The action validates/uploads the File itself and passes the resulting
+    // public URL here — Zod never sees a raw File for either create or update.
+    image: z.string().url("Must be a valid image URL"),
     quantity: z.coerce.number().min(0, "Quantity cannot be negative"),
 });
 
