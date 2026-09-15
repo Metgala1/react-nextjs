@@ -68,7 +68,7 @@ export default async function ProductsPage({ searchParams }: SearchParamsProps) 
                         <p className="mt-2 text-slate-600 text-sm max-w-xl">
                             Discover our curated collection of high-performance
                             technology designed to elevate your everyday workflow
-                            and lifestyle.
+                            and lifestyle. 
                         </p>
                     </div>
 
