@@ -63,10 +63,10 @@ export async function createProduct(
     };
   }
 
-  // Image is optional on create: if a File was provided, upload it and use
-  // the resulting public URL. Otherwise fall back to the default image.
-  // (createProductSchema's `image` field expects a string URL here, not a
-  // raw File, so we never forward the File itself.)
+  // Image is optional on create: if a File was provided, upload it and store
+  // the resulting bucket path (e.g. "products/abc123.jpg"). Otherwise fall
+  // back to the default external placeholder URL. We resolve paths to real
+  // URLs at display time via getProductImageUrl(), not here.
   let imagePath: string = DEFAULT_PRODUCT_IMAGE;
   let uploadedPath: string | null = null;
   const supabase = createAdminClient();
@@ -107,11 +107,7 @@ export async function createProduct(
       };
     }
 
-    const { data: publicUrlData } = supabase.storage
-      .from("products")
-      .getPublicUrl(uploadData.path);
-
-    imagePath = publicUrlData.publicUrl;
+    imagePath = uploadData.path;
     uploadedPath = uploadData.path;
   } else if (typeof imageValue === "string" && imageValue.length > 0) {
     imagePath = imageValue;
@@ -252,10 +248,6 @@ export async function updateProduct(
     };
   }
 
-  const { data: publicUrlData } = supabase.storage
-    .from("products")
-    .getPublicUrl(uploadData.path);
-
   const result = updateProductSchema.safeParse({
     name: formData.get("name"),
     price: formData.get("price"),
@@ -264,7 +256,7 @@ export async function updateProduct(
     reviewsCount: formData.get("reviewsCount"),
     description: formData.get("description"),
     specs: specs,
-    image: publicUrlData.publicUrl,
+    image: uploadData.path,
     quantity: formData.get("quantity"),
   });
 
@@ -309,18 +301,6 @@ export async function updateProduct(
   redirect(`/products/${id}`);
 }
 
-// Turns a Supabase public URL like
-// "https://xxxx.supabase.co/storage/v1/object/public/products/abc123.jpg"
-// into just the bucket-relative path "products/abc123.jpg" that
-// supabase.storage.remove() expects. Returns null if the URL doesn't match
-// the expected shape (e.g. it's an external placeholder image, not one of ours).
-function extractStoragePath(publicUrl: string, bucket: string): string | null {
-  const marker = `/object/public/${bucket}/`;
-  const index = publicUrl.indexOf(marker);
-  if (index === -1) return null;
-  return publicUrl.slice(index + marker.length);
-}
-
 export async function deleteProduct(id: number) {
   if (!Number.isInteger(id) || id <= 0) {
     throw new Error("Invalid product ID");
@@ -336,11 +316,8 @@ export async function deleteProduct(id: number) {
     throw new Error("You don't have permission to delete products");
   }
 
-  // Grab the image URL BEFORE deleting the row — once the row is gone,
-  // this is the only place that URL was ever stored.
   const product = await prisma.product.findUnique({
     where: { id },
-    select: { image: true },
   });
 
   if (!product) {
@@ -361,14 +338,14 @@ export async function deleteProduct(id: number) {
   // Best-effort image cleanup. This runs AFTER the DB delete succeeds, and a
   // failure here shouldn't roll back or block the product deletion itself —
   // storage and Postgres aren't in the same transaction, so we just log it.
-  if (product.image && product.image !== DEFAULT_PRODUCT_IMAGE) {
-    const storagePath = extractStoragePath(product.image, "products");
-    if (storagePath) {
-      const supabase = createAdminClient();
-      const { error } = await supabase.storage.from("products").remove([storagePath]);
-      if (error) {
-        console.error("Failed to delete product image from storage:", error);
-      }
+  // Skip cleanup for the external default placeholder — it isn't in our
+  // bucket, so product.image is already a real path only when it's one of
+  // our own uploads (never an http(s) URL).
+  if (product.image && !product.image.startsWith("http")) {
+    const supabase = createAdminClient();
+    const { error } = await supabase.storage.from("products").remove([product.image]);
+    if (error) {
+      console.error("Failed to delete product image from storage:", error);
     }
   }
 

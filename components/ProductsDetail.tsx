@@ -1,6 +1,8 @@
 import {Product} from "@/sevices/product.service"
 import AddToCartSection from "./AddToCartSection"
-export default function ProductDetails(product: Product) {
+import { getProductImageUrl } from "@/lib/supabase/storage"
+export default async function ProductDetails(product: Product) {
+    const imageUrl = await getProductImageUrl(product.image)
     return (
          <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
                     <div className="max-w-5xl mx-auto">
@@ -9,7 +11,7 @@ export default function ProductDetails(product: Product) {
                             {/* Product Image Section */}
                             <div className="relative bg-slate-100 p-8 flex items-center justify-center min-h-[350px]">
                                 <img
-                                    src={product.image}
+                                    src={imageUrl}
                                     alt={product.name}
                                     className="object-cover w-full h-full max-h-[450px] rounded-2xl shadow-md"
                                 />

@@ -8,9 +8,11 @@ export const createProductSchema = z.object({
     reviewsCount: z.coerce.number().min(0, "Review count cannot be negative"),
     description: z.string().trim().min(10, "Description must be at least 10 characters long"),
     specs: z.array(z.string()).min(1, "At least one specification is required"),
-    // The action validates/uploads the File itself and passes the resulting
-    // public URL here — Zod never sees a raw File for either create or update.
-    image: z.string().url("Must be a valid image URL"),
+    // The action validates/uploads the File itself and passes either a
+    // bucket-relative storage path (e.g. "products/abc123.jpg") or the
+    // default external placeholder URL — never a raw File, and no longer
+    // required to be a full URL, since we now store just the path.
+    image: z.string().min(1, "Image is required"),
     quantity: z.coerce.number().min(0, "Quantity cannot be negative"),
 });
 
@@ -22,7 +24,7 @@ export const updateProductSchema = z.object({
     reviewsCount: z.coerce.number().min(0, "Review count cannot be negative"),
     description: z.string().min(10, "Description must be at least 10 characters long"),
     specs: z.array(z.string()).min(1, "At least one specification is required"),
-    image: z.string().url("Must be a valid image URL"),
+    image: z.string().min(1, "Image is required"),
     quantity: z.coerce.number().min(0, "Quantity cannot be negative"),
 });
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;

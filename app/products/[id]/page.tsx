@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import AddToCartSection from "@/components/AddToCartSection";
 import type { Metadata } from "next";
 import { deleteProduct } from "@/actions/products.action";
+import { getProductImageUrl } from "@/lib/supabase/storage";
 
 type Props = {
     params: Promise<{ id: string }>;
@@ -41,6 +42,8 @@ export default async function ProductDetail({ params }: Props) {
         notFound();
     }
 
+    const imageUrl = await getProductImageUrl(product.image)
+
     const deleteProd = deleteProduct.bind(null, product.id);
    
    
@@ -53,7 +56,7 @@ export default async function ProductDetail({ params }: Props) {
                     {/* Product Image Section */}
                     <div className="relative bg-slate-100 p-8 flex items-center justify-center min-h-[350px]">
                         <img
-                            src={product.image}
+                            src={imageUrl}
                             alt={product.name}
                             className="object-cover w-full h-full max-h-[450px] rounded-2xl shadow-md"
                         />

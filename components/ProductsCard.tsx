@@ -1,8 +1,10 @@
 // components/ProductCard.tsx
 import Link from 'next/link';
 import { Product } from '@/data/products';
+import { getProductImageUrl } from '@/lib/supabase/storage';
 
-export default function ProductCard({ product }: { product: Product }) {
+export default async function ProductCard({ product }: { product: Product }) {
+    const imageUrl = await getProductImageUrl(product.image)
     return (
         <Link 
             href={`/products/${product.id}`} 
@@ -11,7 +13,7 @@ export default function ProductCard({ product }: { product: Product }) {
             <div>
                 <div className="relative bg-slate-100 aspect-square overflow-hidden flex items-center justify-center p-6">
                     <img 
-                        src={product.image} 
+                        src={imageUrl} 
                         alt={product.name} 
                         className="object-cover w-full h-full rounded-2xl group-hover:scale-105 transition-transform duration-500"
                     />
