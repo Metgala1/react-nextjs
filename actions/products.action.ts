@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { uploadProductImage, deleteProductImage } from "@/lib/supabase/product-images";
 
 // Small shared helper so both actions parse specs the same way.
 function parseSpecs(formData: FormData): string[] {
@@ -37,9 +37,6 @@ export type CreateProductState = {
 const DEFAULT_PRODUCT_IMAGE =
   "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80";
 
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-
 export async function createProduct(
   previousState: CreateProductState,
   formData: FormData
@@ -64,51 +61,24 @@ export async function createProduct(
   }
 
   // Image is optional on create: if a File was provided, upload it and store
-  // the resulting bucket path (e.g. "products/abc123.jpg"). Otherwise fall
-  // back to the default external placeholder URL. We resolve paths to real
-  // URLs at display time via getProductImageUrl(), not here.
+  // the resulting bucket path. Otherwise fall back to the default external
+  // placeholder URL.
   let imagePath: string = DEFAULT_PRODUCT_IMAGE;
   let uploadedPath: string | null = null;
-  const supabase = createAdminClient();
 
   if (imageValue instanceof File && imageValue.size > 0) {
-    if (!ALLOWED_IMAGE_TYPES.includes(imageValue.type)) {
+    const uploadResult = await uploadProductImage(imageValue);
+
+    if (!uploadResult.success) {
       return {
         success: false,
-        message: "Only JPG, PNG, WebP images are allowed",
-        errors: { image: ["Only JPG, PNG, WebP images are allowed"] },
+        message: uploadResult.message,
+        errors: { image: [uploadResult.message] },
       };
     }
 
-    if (imageValue.size > MAX_IMAGE_SIZE) {
-      return {
-        success: false,
-        message: "Image must be smaller than 5mb",
-        errors: { image: ["Image must be smaller than 5mb"] },
-      };
-    }
-
-    const extension = imageValue.name.split(".").pop() || "jpg";
-    const fileName = `${crypto.randomUUID()}.${extension}`;
-    const filePath = `products/${fileName}`;
-
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("products")
-      .upload(filePath, imageValue, {
-        contentType: imageValue.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error(uploadError);
-      return {
-        success: false,
-        message: "Failed to upload product image",
-      };
-    }
-
-    imagePath = uploadData.path;
-    uploadedPath = uploadData.path;
+    imagePath = uploadResult.path;
+    uploadedPath = uploadResult.path;
   } else if (typeof imageValue === "string" && imageValue.length > 0) {
     imagePath = imageValue;
   }
@@ -126,8 +96,9 @@ export async function createProduct(
   });
 
   if (!result.success) {
+    // Only clean up if we actually uploaded a new file this run.
     if (uploadedPath) {
-      await supabase.storage.from("products").remove([uploadedPath]);
+      await deleteProductImage(uploadedPath);
     }
     return {
       success: false,
@@ -144,7 +115,7 @@ export async function createProduct(
   } catch (err) {
     console.error(err);
     if (uploadedPath) {
-      await supabase.storage.from("products").remove([uploadedPath]);
+      await deleteProductImage(uploadedPath);
     }
     return {
       success: false,
@@ -206,46 +177,44 @@ export async function updateProduct(
   const specs = parseSpecs(formData);
   const image = formData.get("image");
 
-  if (!(image instanceof File)) {
+  // A submitted <input type="file"> with nothing selected still sends a
+  // File object — just an empty one (size 0, name ""). Treat that the same
+  // as "no new image" rather than requiring a re-upload on every edit.
+  const hasNewImage = image instanceof File && image.size > 0;
+
+  // Look up the product's current image regardless of whether a new file
+  // was uploaded — we need it either to delete (new image case) or to
+  // reuse as-is (no new image case).
+  const existingProduct = await prisma.product.findUnique({
+    where: { id },
+  });
+
+  if (!existingProduct) {
     return {
       success: false,
-      message: "Product image is required",
+      message: "Product not found",
     };
   }
 
-  if (!ALLOWED_IMAGE_TYPES.includes(image.type)) {
-    return {
-      success: false,
-      message: "Only JPG, PNG, WebP images are allowed",
-    };
-  }
+  // Default to keeping whatever image is already there.
+  let imagePath: string = existingProduct.image;
+  let uploadedPath: string | null = null;
 
-  if (image.size > MAX_IMAGE_SIZE) {
-    return {
-      success: false,
-      message: "Image must be smaller than 5mb",
-    };
-  }
+  if (hasNewImage) {
+    // Delete the old image before uploading the new one.
+    await deleteProductImage(existingProduct.image);
 
-  const extension = image.name.split(".").pop() || "jpg";
-  const fileName = `${crypto.randomUUID()}.${extension}`;
-  const filePath = `products/${fileName}`;
+    const uploadResult = await uploadProductImage(image);
 
-  const supabase = createAdminClient();
-  const { data: uploadData, error: uploadError } = await supabase.storage
-    .from("products")
-    .upload(filePath, image, {
-      contentType: image.type,
-      upsert: false,
-    });
+    if (!uploadResult.success) {
+      return {
+        success: false,
+        message: uploadResult.message,
+      };
+    }
 
-  if (uploadError) {
-    console.error(uploadError);
-
-    return {
-      success: false,
-      message: "Failed to upload product image",
-    };
+    imagePath = uploadResult.path;
+    uploadedPath = uploadResult.path;
   }
 
   const result = updateProductSchema.safeParse({
@@ -256,13 +225,14 @@ export async function updateProduct(
     reviewsCount: formData.get("reviewsCount"),
     description: formData.get("description"),
     specs: specs,
-    image: uploadData.path,
+    image: imagePath,
     quantity: formData.get("quantity"),
   });
 
   if (!result.success) {
-    // Clean up the file we just uploaded since we're not going to use it.
-    await supabase.storage.from("products").remove([uploadData.path]);
+    if (uploadedPath) {
+      await deleteProductImage(uploadedPath);
+    }
 
     return {
       success: false,
@@ -286,8 +256,9 @@ export async function updateProduct(
     });
   } catch (err) {
     console.error(err);
-    // Clean up the uploaded file since the DB update failed.
-    await supabase.storage.from("products").remove([uploadData.path]);
+    if (uploadedPath) {
+      await deleteProductImage(uploadedPath);
+    }
 
     return {
       success: false,
@@ -335,19 +306,7 @@ export async function deleteProduct(id: number) {
     throw new Error("Something went wrong while deleting the product");
   }
 
-  // Best-effort image cleanup. This runs AFTER the DB delete succeeds, and a
-  // failure here shouldn't roll back or block the product deletion itself —
-  // storage and Postgres aren't in the same transaction, so we just log it.
-  // Skip cleanup for the external default placeholder — it isn't in our
-  // bucket, so product.image is already a real path only when it's one of
-  // our own uploads (never an http(s) URL).
-  if (product.image && !product.image.startsWith("http")) {
-    const supabase = createAdminClient();
-    const { error } = await supabase.storage.from("products").remove([product.image]);
-    if (error) {
-      console.error("Failed to delete product image from storage:", error);
-    }
-  }
+  await deleteProductImage(product.image);
 
   revalidatePath("/products");
   redirect("/products");

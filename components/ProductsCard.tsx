@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { Product } from '@/data/products';
 import { getProductImageUrl } from '@/lib/supabase/storage';
+import Image from 'next/image';
 
 export default async function ProductCard({ product }: { product: Product }) {
     const imageUrl = await getProductImageUrl(product.image)
@@ -12,11 +13,20 @@ export default async function ProductCard({ product }: { product: Product }) {
         >
             <div>
                 <div className="relative bg-slate-100 aspect-square overflow-hidden flex items-center justify-center p-6">
-                    <img 
+                    {product.image ? 
+                    <Image 
                         src={imageUrl} 
                         alt={product.name} 
                         className="object-cover w-full h-full rounded-2xl group-hover:scale-105 transition-transform duration-500"
-                    />
+                        // width={500}
+                        // height={500}
+                        fill
+                    /> :
+                    <div>
+                        No Image
+                    </div>
+                    }
+                    
                     <span className="absolute top-4 left-4 bg-white/90 backdrop-blur-md text-slate-800 text-xs font-semibold px-3 py-1 rounded-full shadow-xs">
                         {product.category}
                     </span>

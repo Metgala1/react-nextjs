@@ -120,3 +120,6 @@ export async function requirePermission(
 
   return session
 }
+
+//Require ownership is a check to implemeented do this users own the orders or the products
+//it comes after auth check

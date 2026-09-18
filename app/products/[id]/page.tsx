@@ -4,6 +4,7 @@ import AddToCartSection from "@/components/AddToCartSection";
 import type { Metadata } from "next";
 import { deleteProduct } from "@/actions/products.action";
 import { getProductImageUrl } from "@/lib/supabase/storage";
+import Image from "next/image";
 
 type Props = {
     params: Promise<{ id: string }>;
@@ -55,10 +56,11 @@ export default async function ProductDetail({ params }: Props) {
 
                     {/* Product Image Section */}
                     <div className="relative bg-slate-100 p-8 flex items-center justify-center min-h-[350px]">
-                        <img
+                        <Image
                             src={imageUrl}
                             alt={product.name}
                             className="object-cover w-full h-full max-h-[450px] rounded-2xl shadow-md"
+                            fill
                         />
 
                         <span className="absolute top-6 left-6 bg-white/90 backdrop-blur-md text-slate-800 text-xs font-semibold px-3 py-1.5 rounded-full shadow-xs">
