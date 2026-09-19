@@ -1,6 +1,6 @@
 // actions/products.action.ts
 "use server";
-import { addProduct, updateProducts } from "@/sevices/product.service";
+import { addProduct } from "@/sevices/product.service";
 import { createProductSchema, updateProductSchema } from "@/validation/product";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";

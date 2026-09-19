@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma"
+import { getProductById } from "@/sevices/product.service"
 
 type Props = {
   params: Promise<{
@@ -25,11 +25,7 @@ export async function GET(
     )
   }
 
-  const product = await prisma.product.findUnique({
-    where: {
-      id: productId,
-    },
-  })
+  const product = await getProductById(productId)
 
   if (!product) {
     return Response.json(

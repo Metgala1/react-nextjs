@@ -1,86 +1,102 @@
 import { getCurrentUser } from "@/lib/auth";
-import {prisma} from "@/lib/prisma"
-import { createProductSchema } from "@/schema/products.schema"
-import { createProduct } from "@/sevices/product.service"
+import { createProductSchema } from "@/schema/products.schema";
+import { createProduct } from "@/sevices/product.service";
 import { hasPermission } from "@/lib/permissions";
-
-
 import { NextResponse } from "next/server";
+import { getProducts } from "@/sevices/product.service";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
+
   const search = url.searchParams.get("search")?.trim() || "";
   const category = url.searchParams.get("category")?.trim() || "all";
+  const page = url.searchParams.get("page") || undefined;
 
   try {
-    // Build dynamic query conditions for Prisma
-    const whereCondition: any = {};
+    const products = await getProducts(search , category , page)
 
-    // Handle search query (filters by name or description)
-    if (search !== "") {
-      whereCondition.OR = [
-        { name: { contains: search, mode: "insensitive" } },
-        { description: { contains: search, mode: "insensitive" } },
-      ];
-    }
-
-    // Handle category filter (skip if "all" or empty)
-    if (category.toLowerCase() !== "all" && category !== "") {
-      whereCondition.category = {
-        equals: category,
-        mode: "insensitive",
-      };
-    }
-
-    const products = await prisma.product.findMany({
-      where: whereCondition,
-      orderBy: { rating: "desc" },
-    });
-
-    return NextResponse.json(products);
+    return NextResponse.json(products.products);
   } catch (error) {
     console.error("Failed to fetch products:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+
+    return NextResponse.json(
+      {
+        error: "Internal Server Error",
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }
 
-
-
-
 export async function POST(request: Request) {
-    const body = await request.json()
-    const user = await getCurrentUser()
+  try {
+    const body = await request.json();
 
+    const user = await getCurrentUser();
 
-
-    const result = createProductSchema.safeParse(body)
-
-    if(!result.success) {
-        return Response.json({
-            success: false,
-            message: result.error.flatten().fieldErrors,
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Authentication required",
         },
         {
-            status: 400
+          status: 401,
         }
-    )
-    }
-    if(!user) {
-        return Response.json({
-            status: 401,
-            message: "Authentication required"
-        })
+      );
     }
 
-    if(!hasPermission(user.UserRole , "products:create")) {
-        return Response.json({
-            status: 403,
-            message: "Forbidden"
-        })
+    if (!hasPermission(user.UserRole, "products:create")) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Forbidden",
+        },
+        {
+          status: 403,
+        }
+      );
     }
 
-    const product = await createProduct(result.data)
+    const result = createProductSchema.safeParse(body);
 
-    return Response.json(product)
+    if (!result.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Validation failed",
+          errors: result.error.flatten().fieldErrors,
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
+    const product = await createProduct(result.data);
+
+    return NextResponse.json(
+      {
+        success: true,
+        product,
+      },
+      {
+        status: 201,
+      }
+    );
+  } catch (error) {
+    console.error("Failed to create product:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Internal Server Error",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
 }
