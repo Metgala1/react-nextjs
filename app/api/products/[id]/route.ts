@@ -1,83 +1,116 @@
-import { getCurrentUser, requirePermission } from "@/lib/auth"
-import { hasPermission } from "@/lib/permissions"
-import { deleteProduct, getProductById, updateProduct } from "@/sevices/product.service"
+import { getCurrentUser } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
+import { errorResponse } from "@/lib/api-response";
+import { successResponse } from "@/lib/api-response";
+
+import {
+  deleteProduct,
+  getProductById,
+  updateProduct,
+} from "@/sevices/product.service";
+import { updateProductSchema } from "@/validation/product";
+import { z } from "zod";
 
 type Props = {
   params: Promise<{
-    id: string
-  }>
-}
+    id: string;
+  }>;
+};
+
+export type UpdateProduct = z.infer<typeof updateProductSchema>;
 
 export async function GET(
   request: Request,
   { params }: Props
 ) {
-  const { id } = await params
+  const { id } = await params;
 
-  const productId = Number(id)
+  const productId = Number(id);
 
-  if (Number.isNaN(productId)) {
-    return Response.json(
-      {
-        message: "Invalid product ID",
-      },
-      {
-        status: 400,
-      }
-    )
+  if (!Number.isInteger(productId) || productId <= 0) {
+    return errorResponse(
+      "Invalid product ID",
+      "INVALID_PRODUCT_ID",
+      400
+    );
   }
 
-  const product = await getProductById(productId)
+  const product = await getProductById(productId);
 
   if (!product) {
-    return Response.json(
-      {
-        message: "Product not found",
-      },
-      {
-        status: 404,
-      }
-    )
+    return errorResponse(
+      "Product not found",
+      "PRODUCT_NOT_FOUND",
+      404
+    );
   }
 
-  return Response.json(product)
+  return successResponse(product);
 }
-import { updateProductSchema } from "@/validation/product"
-import { z } from "zod"
 
-export type UpdateProduct = z.infer<typeof updateProductSchema>
+export async function PATCH(
+  request: Request,
+  { params }: Props
+) {
+  const { id } = await params;
 
-export async function PATCH(request: Request, { params }: Props) {
-  const { id } = await params
-  const body = await request.json()
+  const productId = Number(id);
 
-  const productId = Number(id)
-  if (Number.isNaN(productId) || productId < 0) {
-    return Response.json({ message: "Invalid productId" }, { status: 404 })
+  if (!Number.isInteger(productId) || productId <= 0) {
+    return errorResponse(
+      "Invalid product ID",
+      "INVALID_PRODUCT_ID",
+      400
+    );
   }
 
-  const user = await getCurrentUser()
+  const user = await getCurrentUser();
+
   if (!user) {
-    return Response.json({ message: "Authentication required" }, { status: 401 })
+    return errorResponse(
+      "Authentication required",
+      "UNAUTHENTICATED",
+      401
+    );
   }
 
   if (!hasPermission(user.UserRole, "products:update")) {
-    return Response.json({ message: "User does not have permission" }, { status: 403 })
+    return errorResponse(
+      "User does not have permission",
+      "FORBIDDEN",
+      403
+    );
   }
 
-  const result = updateProductSchema.safeParse(body)
+  const body = await request.json();
+
+  const result = updateProductSchema.safeParse(body);
+
   if (!result.success) {
-    return Response.json({ message: result.error.flatten().fieldErrors }, { status: 400 })
+    return errorResponse(
+      "Validation failed",
+      "VALIDATION_ERROR",
+      400,
+      result.error.flatten().fieldErrors
+    );
   }
 
-  const existingProduct = await getProductById(productId)
+  const existingProduct = await getProductById(productId);
+
   if (!existingProduct) {
-    return Response.json({ message: "Product not found" }, { status: 404 })
+    return errorResponse(
+      "Product not found",
+      "PRODUCT_NOT_FOUND",
+      404
+    );
   }
 
-  const updatedProduct = await updateProduct(productId, result.data)
+  const updatedProduct = await updateProduct(
+    productId,
+    result.data
+  );
 
-  return Response.json(updatedProduct, { status: 200 })
+  return successResponse(updatedProduct);
 }
 
 export async function DELETE(
@@ -85,31 +118,49 @@ export async function DELETE(
   { params }: Props
 ) {
   const { id } = await params;
+
   const productId = Number(id);
 
-  if (Number.isNaN(productId)) {
-    return Response.json({
-      message: "Invalid Product Id"
-    }, { status: 400 });
+  if (!Number.isInteger(productId) || productId <= 0) {
+    return errorResponse(
+      "Invalid product ID",
+      "INVALID_PRODUCT_ID",
+      400
+    );
   }
 
   const user = await getCurrentUser();
 
   if (!user) {
-    return Response.json({
-      message: "Authentication is required"
-    }, { status: 401 });
+    return errorResponse(
+      "Authentication required",
+      "UNAUTHENTICATED",
+      401
+    );
   }
 
   if (!hasPermission(user.UserRole, "products:delete")) {
-    return Response.json({
-      message: "User does not have permission"
-    }, { status: 403 });
+    return errorResponse(
+      "User does not have permission",
+      "FORBIDDEN",
+      403
+    );
   }
-   
-  await deleteProduct(productId);
 
-  return Response.json({
-    message: "Product deleted successfully"
-  }, { status: 200 });
+  const existingProduct = await getProductById(productId);
+
+  if (!existingProduct) {
+    return errorResponse(
+      "Product not found",
+      "PRODUCT_NOT_FOUND",
+      404
+    );
+  }
+
+  const deletedProduct = await deleteProduct(productId);
+
+  return successResponse({
+    message: "Product deleted successfully",
+    product: deletedProduct,
+  });
 }

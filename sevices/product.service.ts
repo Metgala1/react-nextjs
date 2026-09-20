@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/app/generated/prisma/client";
+import { AppError } from "@/lib/errors";
 
 const productWithCategory = {
   include: {
@@ -150,7 +151,11 @@ export async function getProductById(id: number): Promise<ProductDTO> {
   });
 
   if (!product) {
-    throw new Error(`Product with id ${id} not found`);
+    throw new AppError(
+      "Product not found",
+      404,
+      "PRODUCT_NOT_FOUND"
+    )
   }
 
   return product;
