@@ -1,6 +1,7 @@
 "use client"
 
 import { Product } from "@/sevices/product.service";
+import next from "next";
 import { useEffect, useState } from "react";
 
 export default function TestApi() {
@@ -12,7 +13,11 @@ export default function TestApi() {
         async function getProduct() {
             try{
                 setLoading(true)
-                const response = await fetch(`http://localhost:3000/api/products`)
+                const response = await fetch(`http://localhost:3000/api/products`,
+                    {
+                        next: {revalidate: 120}
+                    }
+                )
                 const result = await response.json()
                 setProducts(result)
 

@@ -267,6 +267,7 @@ export async function updateProduct(
   }
 
   revalidatePath(`/products`);
+  revalidatePath(`/test`)
   revalidatePath(`/products/${id}`);
 
   redirect(`/products/${id}`);

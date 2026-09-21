@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { errorResponse } from "@/lib/api-response";
 import { successResponse } from "@/lib/api-response";
+import { handleApiError } from "@/lib/handle-api-error";
 
 import {
   deleteProduct,
@@ -34,18 +35,14 @@ export async function GET(
       400
     );
   }
-
+  try{
   const product = await getProductById(productId);
+   return successResponse(product)
 
-  if (!product) {
-    return errorResponse(
-      "Product not found",
-      "PRODUCT_NOT_FOUND",
-      404
-    );
+  }catch(error) {
+    handleApiError(error)
+
   }
-
-  return successResponse(product);
 }
 
 export async function PATCH(
@@ -79,7 +76,7 @@ export async function PATCH(
       "User does not have permission",
       "FORBIDDEN",
       403
-    );
+    )
   }
 
   const body = await request.json();
