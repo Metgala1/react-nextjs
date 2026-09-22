@@ -1,0 +1,14 @@
+47.1 API documentation
+- We talked about documentation of api so that it makes it easy for new or other
+developers to understand and use your api
+
+41.12
+- We talked about Openapi and how to structure or describe our api endpoints so that it can be use by
+swagger ui or the developers
+
+41.18: SWAGGER-UI turning OpenApi into real API Explorer
+- added swaggerUi depency using pnpm
+-imported swaggerui in swaggerui.tsx and 
+-finally created a page.tsx in the app/api-docs were in imported and used the swaggerui component
+
+41.19: Documenting Request Bodies, DTOs, Auth & Error
