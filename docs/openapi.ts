@@ -189,6 +189,68 @@ export const openapi = {
           "quantity",
         ],
       },
+      // ========================================
+      // UPDATE PRODUCT INPUT
+      // ========================================
+      UpdateProductInput: {
+        type: "object",
+
+        properties: {
+          name: {
+            type: "string",
+            example: "MacBook Air M4 Updated",
+          },
+
+          price: {
+            type: "number",
+            example: 1099.99,
+          },
+
+          category: {
+            type: "string",
+            example: "Laptops",
+          },
+
+          rating: {
+            type: "number",
+            example: 4.9,
+          },
+
+          reviewsCount: {
+            type: "integer",
+            example: 150,
+          },
+
+          description: {
+            type: "string",
+            example: "Updated product description.",
+          },
+
+          specs: {
+            type: "array",
+
+            items: {
+              type: "string",
+            },
+
+            example: [
+              "M4 chip",
+              "24GB RAM",
+              "1TB SSD",
+            ],
+          },
+
+          image: {
+            type: "string",
+            example: "products/macbook-air-updated.jpg",
+          },
+
+          quantity: {
+            type: "integer",
+            example: 15,
+          },
+        },
+      },
 
       // ========================================
       // PRODUCT RESPONSE
@@ -352,6 +414,234 @@ export const openapi = {
                     message: "Internal server error",
                     code: "INTERNAL_SERVER_ERROR",
                   },
+                },
+              },
+            },
+          },
+        },
+      },
+      patch: {
+        summary: "Update a product",
+
+        description:
+          "Updates an existing product. Authentication and products:update permission are required.",
+
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+
+            description: "The ID of the product.",
+
+            schema: {
+              type: "integer",
+              minimum: 1,
+            },
+          },
+        ],
+
+        requestBody: {
+          required: true,
+
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/UpdateProductInput",
+              },
+            },
+          },
+        },
+
+        responses: {
+          "200": {
+            description: "Product updated successfully.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ProductResponse",
+                },
+              },
+            },
+          },
+
+          "400": {
+            description: "Invalid product ID or validation failed.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ApiError",
+                },
+              },
+            },
+          },
+
+          "401": {
+            description: "Authentication required.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ApiError",
+                },
+              },
+            },
+          },
+
+          "403": {
+            description: "User does not have permission.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ApiError",
+                },
+              },
+            },
+          },
+
+          "404": {
+            description: "Product not found.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ApiError",
+                },
+              },
+            },
+          },
+
+          "500": {
+            description: "Internal server error.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ApiError",
+                },
+              },
+            },
+          },
+        },
+      },
+      delete: {
+        summary: "Delete a product",
+
+        description:
+          "Deletes an existing product. Authentication and products:delete permission are required.",
+
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+
+            description: "The ID of the product.",
+
+            schema: {
+              type: "integer",
+              minimum: 1,
+            },
+          },
+        ],
+
+        responses: {
+          "200": {
+            description: "Product deleted successfully.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+
+                  properties: {
+                    success: {
+                      type: "boolean",
+                      example: true,
+                    },
+
+                    data: {
+                      type: "object",
+
+                      properties: {
+                        message: {
+                          type: "string",
+                          example: "Product deleted successfully",
+                        },
+
+                        product: {
+                          $ref: "#/components/schemas/Product",
+                        },
+                      },
+
+                      required: ["message", "product"],
+                    },
+                  },
+
+                  required: ["success", "data"],
+                },
+              },
+            },
+          },
+
+          "400": {
+            description: "Invalid product ID.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ApiError",
+                },
+              },
+            },
+          },
+
+          "401": {
+            description: "Authentication required.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ApiError",
+                },
+              },
+            },
+          },
+
+          "403": {
+            description: "User does not have permission.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ApiError",
+                },
+              },
+            },
+          },
+
+          "404": {
+            description: "Product not found.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ApiError",
+                },
+              },
+            },
+          },
+
+          "500": {
+            description: "Internal server error.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ApiError",
                 },
               },
             },
