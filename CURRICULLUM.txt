@@ -12,3 +12,6 @@ swagger ui or the developers
 -finally created a page.tsx in the app/api-docs were in imported and used the swaggerui component
 
 41.19: Documenting Request Bodies, DTOs, Auth & Error
+
+47.30: Final API Architecture Checkpoint
+-Has everything we've done so far

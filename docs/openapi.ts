@@ -8,10 +8,15 @@ export const openapi = {
   },
 
   components: {
+    // =========================================================
+    // SCHEMAS
+    // =========================================================
+
     schemas: {
-      // ========================================
+      // ---------------------------------------------------------
       // CATEGORY
-      // ========================================
+      // ---------------------------------------------------------
+
       Category: {
         type: "object",
 
@@ -35,9 +40,10 @@ export const openapi = {
         required: ["id", "name", "slug"],
       },
 
-      // ========================================
+      // ---------------------------------------------------------
       // PRODUCT
-      // ========================================
+      // ---------------------------------------------------------
+
       Product: {
         type: "object",
 
@@ -115,9 +121,10 @@ export const openapi = {
         ],
       },
 
-      // ========================================
+      // ---------------------------------------------------------
       // CREATE PRODUCT INPUT
-      // ========================================
+      // ---------------------------------------------------------
+
       CreateProductInput: {
         type: "object",
 
@@ -134,7 +141,7 @@ export const openapi = {
 
           category: {
             type: "string",
-            example: "Laptop",
+            example: "Laptops",
           },
 
           rating: {
@@ -189,9 +196,11 @@ export const openapi = {
           "quantity",
         ],
       },
-      // ========================================
+
+      // ---------------------------------------------------------
       // UPDATE PRODUCT INPUT
-      // ========================================
+      // ---------------------------------------------------------
+
       UpdateProductInput: {
         type: "object",
 
@@ -252,9 +261,10 @@ export const openapi = {
         },
       },
 
-      // ========================================
-      // PRODUCT RESPONSE
-      // ========================================
+      // ---------------------------------------------------------
+      // SINGLE PRODUCT RESPONSE
+      // ---------------------------------------------------------
+
       ProductResponse: {
         type: "object",
 
@@ -272,9 +282,91 @@ export const openapi = {
         required: ["success", "data"],
       },
 
-      // ========================================
+      // ---------------------------------------------------------
+      // PRODUCT LIST RESPONSE
+      // ---------------------------------------------------------
+
+      ProductListResponse: {
+        type: "object",
+
+        properties: {
+          success: {
+            type: "boolean",
+            example: true,
+          },
+
+          data: {
+            type: "object",
+
+            properties: {
+              products: {
+                type: "array",
+
+                items: {
+                  $ref: "#/components/schemas/Product",
+                },
+              },
+
+              totalPages: {
+                type: "integer",
+                example: 5,
+              },
+
+              currentPage: {
+                type: "integer",
+                example: 2,
+              },
+            },
+
+            required: [
+              "products",
+              "totalPages",
+              "currentPage",
+            ],
+          },
+        },
+
+        required: ["success", "data"],
+      },
+
+      // ---------------------------------------------------------
+      // PRODUCT DELETED RESPONSE
+      // ---------------------------------------------------------
+
+      ProductDeletedResponse: {
+        type: "object",
+
+        properties: {
+          success: {
+            type: "boolean",
+            example: true,
+          },
+
+          data: {
+            type: "object",
+
+            properties: {
+              message: {
+                type: "string",
+                example: "Product deleted successfully",
+              },
+
+              product: {
+                $ref: "#/components/schemas/Product",
+              },
+            },
+
+            required: ["message", "product"],
+          },
+        },
+
+        required: ["success", "data"],
+      },
+
+      // ---------------------------------------------------------
       // API ERROR
-      // ========================================
+      // ---------------------------------------------------------
+
       ApiError: {
         type: "object",
 
@@ -311,13 +403,327 @@ export const openapi = {
         required: ["success", "error"],
       },
     },
+
+    // =========================================================
+    // REUSABLE RESPONSES
+    // =========================================================
+
+    responses: {
+      // ---------------------------------------------------------
+      // 400 VALIDATION ERROR
+      // ---------------------------------------------------------
+
+      ValidationError: {
+        description: "Request validation failed.",
+
+        content: {
+          "application/json": {
+            schema: {
+              $ref: "#/components/schemas/ApiError",
+            },
+
+            example: {
+              success: false,
+
+              error: {
+                message: "Validation failed",
+
+                code: "VALIDATION_ERROR",
+
+                details: {
+                  name: ["Name is required"],
+                  price: ["Price must be greater than 0"],
+                },
+              },
+            },
+          },
+        },
+      },
+
+      // ---------------------------------------------------------
+      // 400 INVALID PRODUCT ID
+      // ---------------------------------------------------------
+
+      InvalidProductId: {
+        description: "Invalid product ID.",
+
+        content: {
+          "application/json": {
+            schema: {
+              $ref: "#/components/schemas/ApiError",
+            },
+
+            example: {
+              success: false,
+
+              error: {
+                message: "Invalid product ID",
+                code: "INVALID_PRODUCT_ID",
+              },
+            },
+          },
+        },
+      },
+
+      // ---------------------------------------------------------
+      // 401 UNAUTHORIZED
+      // ---------------------------------------------------------
+
+      Unauthorized: {
+        description: "Authentication required.",
+
+        content: {
+          "application/json": {
+            schema: {
+              $ref: "#/components/schemas/ApiError",
+            },
+
+            example: {
+              success: false,
+
+              error: {
+                message: "Authentication required",
+                code: "UNAUTHENTICATED",
+              },
+            },
+          },
+        },
+      },
+
+      // ---------------------------------------------------------
+      // 403 FORBIDDEN
+      // ---------------------------------------------------------
+
+      Forbidden: {
+        description: "User does not have permission.",
+
+        content: {
+          "application/json": {
+            schema: {
+              $ref: "#/components/schemas/ApiError",
+            },
+
+            example: {
+              success: false,
+
+              error: {
+                message: "Forbidden",
+                code: "FORBIDDEN",
+              },
+            },
+          },
+        },
+      },
+
+      // ---------------------------------------------------------
+      // 404 PRODUCT NOT FOUND
+      // ---------------------------------------------------------
+
+      ProductNotFound: {
+        description: "Product not found.",
+
+        content: {
+          "application/json": {
+            schema: {
+              $ref: "#/components/schemas/ApiError",
+            },
+
+            example: {
+              success: false,
+
+              error: {
+                message: "Product not found",
+                code: "PRODUCT_NOT_FOUND",
+              },
+            },
+          },
+        },
+      },
+
+      // ---------------------------------------------------------
+      // 500 INTERNAL SERVER ERROR
+      // ---------------------------------------------------------
+
+      InternalServerError: {
+        description: "Internal server error.",
+
+        content: {
+          "application/json": {
+            schema: {
+              $ref: "#/components/schemas/ApiError",
+            },
+
+            example: {
+              success: false,
+
+              error: {
+                message: "Internal server error",
+                code: "INTERNAL_SERVER_ERROR",
+              },
+            },
+          },
+        },
+      },
+    },
+    securitySchemes: {
+      sessionCookie: {
+        type: "apiKey",
+        in: "cookie",
+        name: "session",
+      },
+    },
   },
 
+  // ===========================================================
+  // API PATHS
+  // ===========================================================
+
   paths: {
-    // ========================================
-    // GET /api/products/{id}
-    // ========================================
+    // =========================================================
+    // /api/products
+    // =========================================================
+
+    "/api/products": {
+      // -------------------------------------------------------
+      // GET /api/products
+      // -------------------------------------------------------
+
+      get: {
+        summary: "Get products",
+
+        description:
+          "Returns a paginated list of products with optional search and category filtering.",
+
+        parameters: [
+          {
+            name: "search",
+            in: "query",
+            required: false,
+            description:
+              "Search products by name or description.",
+
+            schema: {
+              type: "string",
+              example: "laptop",
+            },
+          },
+
+          {
+            name: "category",
+            in: "query",
+            required: false,
+            description:
+              "Filter products by category name.",
+
+            schema: {
+              type: "string",
+              example: "Laptops",
+            },
+          },
+
+          {
+            name: "page",
+            in: "query",
+            required: false,
+            description:
+              "The page number to retrieve.",
+
+            schema: {
+              type: "integer",
+              minimum: 1,
+              default: 1,
+              example: 2,
+            },
+          },
+        ],
+
+        responses: {
+          "200": {
+            description: "Products retrieved successfully.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ProductListResponse",
+                },
+              },
+            },
+          },
+
+          "500": {
+            $ref: "#/components/responses/InternalServerError",
+          },
+        },
+      },
+
+      // -------------------------------------------------------
+      // POST /api/products
+      // -------------------------------------------------------
+
+      post: {
+        summary: "Create a product",
+
+        description:
+          "Creates a new product. Authentication and products:create permission are required.",
+        security: [
+          {
+            sessionCookie: [],
+          },
+        ],
+
+        requestBody: {
+          required: true,
+
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/CreateProductInput",
+              },
+            },
+          },
+        },
+
+        responses: {
+          "201": {
+            description: "Product created successfully.",
+
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ProductResponse",
+                },
+              },
+            },
+          },
+
+          "400": {
+            $ref: "#/components/responses/ValidationError",
+          },
+
+          "401": {
+            $ref: "#/components/responses/Unauthorized",
+          },
+
+          "403": {
+            $ref: "#/components/responses/Forbidden",
+          },
+
+          "500": {
+            $ref: "#/components/responses/InternalServerError",
+          },
+        },
+      },
+    },
+
+    // =========================================================
+    // /api/products/{id}
+    // =========================================================
+
     "/api/products/{id}": {
+      // -------------------------------------------------------
+      // GET /api/products/{id}
+      // -------------------------------------------------------
+
       get: {
         summary: "Get a product by ID",
 
@@ -329,7 +735,6 @@ export const openapi = {
             name: "id",
             in: "path",
             required: true,
-
             description: "The ID of the product.",
 
             schema: {
@@ -340,7 +745,6 @@ export const openapi = {
         ],
 
         responses: {
-          // 200
           "200": {
             description: "Product retrieved successfully.",
 
@@ -353,85 +757,40 @@ export const openapi = {
             },
           },
 
-          // 400
           "400": {
-            description: "Invalid product ID.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-
-                example: {
-                  success: false,
-
-                  error: {
-                    message: "Invalid product ID",
-                    code: "INVALID_PRODUCT_ID",
-                  },
-                },
-              },
-            },
+            $ref: "#/components/responses/InvalidProductId",
           },
 
-          // 404
           "404": {
-            description: "Product not found.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-
-                example: {
-                  success: false,
-
-                  error: {
-                    message: "Product not found",
-                    code: "PRODUCT_NOT_FOUND",
-                  },
-                },
-              },
-            },
+            $ref: "#/components/responses/ProductNotFound",
           },
 
-          // 500
           "500": {
-            description: "Internal server error.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-
-                example: {
-                  success: false,
-
-                  error: {
-                    message: "Internal server error",
-                    code: "INTERNAL_SERVER_ERROR",
-                  },
-                },
-              },
-            },
+            $ref: "#/components/responses/InternalServerError",
           },
         },
       },
+
+      // -------------------------------------------------------
+      // PATCH /api/products/{id}
+      // -------------------------------------------------------
+
       patch: {
         summary: "Update a product",
 
         description:
           "Updates an existing product. Authentication and products:update permission are required.",
+        security: [
+          {
+            sessionCookie: [],
+          },
+        ],
 
         parameters: [
           {
             name: "id",
             in: "path",
             required: true,
-
             description: "The ID of the product.",
 
             schema: {
@@ -467,78 +826,47 @@ export const openapi = {
           },
 
           "400": {
-            description: "Invalid product ID or validation failed.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-              },
-            },
+            $ref: "#/components/responses/ValidationError",
           },
 
           "401": {
-            description: "Authentication required.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-              },
-            },
+            $ref: "#/components/responses/Unauthorized",
           },
 
           "403": {
-            description: "User does not have permission.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-              },
-            },
+            $ref: "#/components/responses/Forbidden",
           },
 
           "404": {
-            description: "Product not found.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-              },
-            },
+            $ref: "#/components/responses/ProductNotFound",
           },
 
           "500": {
-            description: "Internal server error.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-              },
-            },
+            $ref: "#/components/responses/InternalServerError",
           },
         },
       },
+
+      // -------------------------------------------------------
+      // DELETE /api/products/{id}
+      // -------------------------------------------------------
+
       delete: {
         summary: "Delete a product",
 
         description:
           "Deletes an existing product. Authentication and products:delete permission are required.",
+        security: [
+          {
+            sessionCookie: [],
+          },
+        ],
 
         parameters: [
           {
             name: "id",
             in: "path",
             required: true,
-
             description: "The ID of the product.",
 
             schema: {
@@ -555,231 +883,30 @@ export const openapi = {
             content: {
               "application/json": {
                 schema: {
-                  type: "object",
-
-                  properties: {
-                    success: {
-                      type: "boolean",
-                      example: true,
-                    },
-
-                    data: {
-                      type: "object",
-
-                      properties: {
-                        message: {
-                          type: "string",
-                          example: "Product deleted successfully",
-                        },
-
-                        product: {
-                          $ref: "#/components/schemas/Product",
-                        },
-                      },
-
-                      required: ["message", "product"],
-                    },
-                  },
-
-                  required: ["success", "data"],
+                  $ref: "#/components/schemas/ProductDeletedResponse",
                 },
               },
             },
           },
 
           "400": {
-            description: "Invalid product ID.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-              },
-            },
+            $ref: "#/components/responses/InvalidProductId",
           },
 
           "401": {
-            description: "Authentication required.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-              },
-            },
+            $ref: "#/components/responses/Unauthorized",
           },
 
           "403": {
-            description: "User does not have permission.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-              },
-            },
+            $ref: "#/components/responses/Forbidden",
           },
 
           "404": {
-            description: "Product not found.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-              },
-            },
+            $ref: "#/components/responses/ProductNotFound",
           },
 
           "500": {
-            description: "Internal server error.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-
-    // ========================================
-    // /api/products
-    // ========================================
-    "/api/products": {
-      // ======================================
-      // POST /api/products
-      // ======================================
-      post: {
-        summary: "Create a product",
-
-        description:
-          "Creates a new product. Authentication and products:create permission are required.",
-
-        requestBody: {
-          required: true,
-
-          content: {
-            "application/json": {
-              schema: {
-                $ref: "#/components/schemas/CreateProductInput",
-              },
-            },
-          },
-        },
-
-        responses: {
-          // 201
-          "201": {
-            description: "Product created successfully.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ProductResponse",
-                },
-              },
-            },
-          },
-
-          // 400
-          "400": {
-            description: "Validation failed.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-
-                example: {
-                  success: false,
-
-                  error: {
-                    message: "Validation failed",
-                    code: "VALIDATION_ERROR",
-
-                    details: {
-                      name: ["Name is required"],
-                      price: ["Price must be greater than 0"],
-                    },
-                  },
-                },
-              },
-            },
-          },
-
-          // 401
-          "401": {
-            description: "Authentication required.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-
-                example: {
-                  success: false,
-
-                  error: {
-                    message: "Authentication required",
-                    code: "UNAUTHENTICATED",
-                  },
-                },
-              },
-            },
-          },
-
-          // 403
-          "403": {
-            description: "User does not have permission.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-
-                example: {
-                  success: false,
-
-                  error: {
-                    message: "Forbidden",
-                    code: "FORBIDDEN",
-                  },
-                },
-              },
-            },
-          },
-
-          // 500
-          "500": {
-            description: "Internal server error.",
-
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: "#/components/schemas/ApiError",
-                },
-
-                example: {
-                  success: false,
-
-                  error: {
-                    message: "Internal server error",
-                    code: "INTERNAL_SERVER_ERROR",
-                  },
-                },
-              },
-            },
+            $ref: "#/components/responses/InternalServerError",
           },
         },
       },
