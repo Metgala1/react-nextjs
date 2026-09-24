@@ -15,7 +15,7 @@ export function handleApiError(error: unknown) {
 
     return errorResponse(
         "Internal Server error",
-        "ITERNAL_SERVER_ERROR",
+        "INTERNAL_SERVER_ERROR",
         500
     )
 }
