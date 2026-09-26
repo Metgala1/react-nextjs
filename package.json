@@ -19,6 +19,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "swagger-ui-react": "^5.33.0",
+    "ws": "^8.21.3",
     "zod": "^4.5.4"
   },
   "devDependencies": {
@@ -27,6 +28,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "prisma": "^6.4.1",
