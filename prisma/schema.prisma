@@ -15,7 +15,7 @@ datasource db {
 }
 
 model Product {
-  id           Int   @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   name         String
   price        Float
   rating       Float
@@ -41,9 +41,11 @@ model User {
   name         String
   email        String   @unique
   passwordHash String
-  UserRole     UserRole @default(ADMIN)
+  UserRole     UserRole @default(CUSTOMER)
 
   sessions     Session[]
+  messages     Message[]
+  rooms        RoomMember[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -60,11 +62,10 @@ model Session {
 }
 
 model Category {
-    id       Int       @id @default(autoincrement())
-    name     String    @unique
-    slug     String    @unique
-    products Product[]
-
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  slug     String    @unique
+  products Product[]
 }
 
 model WebhookEvent {
@@ -72,5 +73,51 @@ model WebhookEvent {
   eventId     String   @unique
   eventType   String
   processedAt DateTime @default(now())
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  roomId    String
+  text      String
+  createdAt DateTime @default(now())
+
+  senderId  Int
+  sender    User     @relation(
+    fields: [senderId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  room      Room     @relation(
+    fields: [roomId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  @@index([roomId])
+}
+
+model Room {
+  id        String       @id @default(cuid())
+  name      String
+  createdAt DateTime     @default(now())
+
+  members   RoomMember[]
+  messages  Message[]
+}
+
+model RoomMember {
+  id        String   @id @default(cuid())
+
+  userId    Int
+  roomId    String
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, roomId])
+  @@index([roomId])
 }
 

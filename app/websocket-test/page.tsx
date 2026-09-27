@@ -40,17 +40,41 @@ export default function WebSocketTestPage() {
           return;
         }
 
+        if (payload.event === "room.history") {
+          const history: ChatMessage[] = payload.data.messages.map(
+            (msg: {
+              id: string;
+              userId: number;
+              message: string;
+              createdAt: string;
+            }) => ({
+              id: msg.id,
+              senderId: String(msg.userId),
+              text: msg.message,
+              timestamp: new Date(msg.createdAt).toLocaleTimeString(),
+            })
+          );
+
+          // Replace, rather than append: this is a fresh room's
+          // full history, not new messages arriving live.
+          setMessages(history);
+          return;
+        }
+
         if (payload.event === "room.message") {
           const senderId = payload.data.userId;
           const text = payload.data.message;
+          const createdAt = payload.data.createdAt;
 
           setMessages((prev) => [
             ...prev,
             {
-              id: Math.random().toString(),
+              id: payload.data.id ?? Math.random().toString(),
               senderId: String(senderId),
               text,
-              timestamp: new Date().toLocaleTimeString(),
+              timestamp: createdAt
+                ? new Date(createdAt).toLocaleTimeString()
+                : new Date().toLocaleTimeString(),
             },
           ]);
         }
