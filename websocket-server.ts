@@ -18,8 +18,10 @@ const wss = new WebSocketServer({
   noServer: true,
 });
 
+// socket -> who is on the other end
 const socketStates = new Map<WebSocket, SocketState>();
 
+// roomId -> every socket currently listening to that room
 const rooms = new Map<string, Set<WebSocket>>();
 
 const ROOM_HISTORY_LIMIT = 50;
@@ -89,34 +91,46 @@ async function authenticateSocket(
   };
 }
 
-// async function authorizeRoomAccess(
-//   state: SocketState,
-//   roomId: string
-// ): Promise<boolean> {
-//   if (state.role === "ADMIN") {
-//     return true;
-//   }
+/*
+ * Can this user enter this room?
+ *
+ * - Admins can enter any room that exists.
+ * - Everyone else needs a RoomMember row linking them to it.
+ *
+ * Nonexistent rooms and rooms you're not in give the same
+ * answer (false), so nobody can probe which rooms exist.
+ */
+async function authorizeRoomAccess(
+  roomId: string,
+  state: SocketState
+): Promise<boolean> {
+  if (state.role === "ADMIN") {
+    const room = await prisma.room.findUnique({
+      where: {
+        id: roomId,
+      },
+      select: {
+        id: true,
+      },
+    });
 
-//   const orderId = Number(
-//     roomId.replace("order-", "")
-//   );
+    return room !== null;
+  }
 
-//   if (!Number.isInteger(orderId)) {
-//     return false;
-//   }
+  const membership = await prisma.roomMember.findUnique({
+    where: {
+      userId_roomId: {
+        userId: state.userId,
+        roomId,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
 
-// //   const order = await prisma.order.findFirst({
-// //     where: {
-// //       id: orderId,
-// //       userId: state.userId,
-// //     },
-// //     select: {
-// //       id: true,
-// //     },
-// //   });
-
-//   return order == null;
-// }
+  return membership !== null;
+}
 
 function joinRoom(socket: WebSocket, roomId: string) {
   if (!rooms.has(roomId)) {
@@ -168,9 +182,8 @@ function broadcastToRoom(
 }
 
 /*
- * Loads the most recent messages for a room, oldest first,
- * so the client can render them top-to-bottom like a normal
- * chat history.
+ * Most recent messages for a room, oldest first,
+ * so the client can render them top-to-bottom.
  */
 async function loadRoomHistory(roomId: string) {
   const messages = await prisma.message.findMany({
@@ -190,6 +203,18 @@ async function loadRoomHistory(roomId: string) {
   });
 
   return messages.reverse();
+}
+
+function sendError(socket: WebSocket, message: string, roomId?: string) {
+  socket.send(
+    JSON.stringify({
+      event: "room.error",
+      data: {
+        roomId,
+        message,
+      },
+    })
+  );
 }
 
 wss.on("connection", (socket) => {
@@ -222,14 +247,7 @@ wss.on("connection", (socket) => {
         const result = websocketMessageSchema.safeParse(rawPayload);
 
         if (!result.success) {
-          socket.send(
-            JSON.stringify({
-              event: "error",
-              data: {
-                message: "Invalid message format",
-              },
-            })
-          );
+          sendError(socket, "Invalid message format");
           return;
         }
 
@@ -237,6 +255,19 @@ wss.on("connection", (socket) => {
 
         if (payload.event === "room.join") {
           const roomId = payload.data.roomId;
+
+          const authorized = await authorizeRoomAccess(roomId, state);
+
+          if (!authorized) {
+            sendError(socket, "You don't have access to this room", roomId);
+            return;
+          }
+
+          // The user may have disconnected while we were checking
+          // the database. Don't add a dead socket to the room.
+          if (socket.readyState !== WebSocket.OPEN) {
+            return;
+          }
 
           joinRoom(socket, roomId);
 
@@ -270,9 +301,11 @@ wss.on("connection", (socket) => {
 
         if (payload.event === "room.message") {
           const roomId = payload.data.roomId;
-          const senderState = socketStates.get(socket);
 
-          if (!senderState) {
+          // Only people who successfully joined (and so passed
+          // the access check) can send into a room.
+          if (!state.rooms.has(roomId)) {
+            sendError(socket, "You have not joined this room", roomId);
             return;
           }
 
@@ -282,7 +315,7 @@ wss.on("connection", (socket) => {
             data: {
               roomId,
               text: payload.data.message,
-              senderId: senderState.userId,
+              senderId: state.userId,
             },
           });
 
@@ -302,13 +335,11 @@ wss.on("connection", (socket) => {
       } catch (error) {
         console.error("Failed to handle message:", error);
 
-        socket.send(
-          JSON.stringify({
-            event: "error",
-            data: {
-              message: "Invalid message",
-            },
-          })
+        sendError(
+          socket,
+          error instanceof SyntaxError
+            ? "Invalid message"
+            : "Something went wrong"
         );
       }
     })();
