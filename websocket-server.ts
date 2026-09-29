@@ -41,10 +41,7 @@ async function authenticateSocket(
     cookieHeader.split(";").map((cookie) => {
       const [name, ...value] = cookie.trim().split("=");
 
-      return [
-        name,
-        decodeURIComponent(value.join("=")),
-      ];
+      return [name, decodeURIComponent(value.join("="))];
     })
   );
 
@@ -164,10 +161,7 @@ function leaveRoom(socket: WebSocket, roomId: string) {
   }
 }
 
-function broadcastToRoom(
-  roomId: string,
-  message: string
-) {
+function broadcastToRoom(roomId: string, message: string) {
   const room = rooms.get(roomId);
 
   if (!room) {
@@ -225,9 +219,7 @@ wss.on("connection", (socket) => {
     return;
   }
 
-  console.log(
-    `User ${state.userId} connected with role ${state.role}`
-  );
+  console.log(`User ${state.userId} connected with role ${state.role}`);
 
   // Tell this browser its own real, server-verified user ID
   socket.send(
@@ -283,6 +275,10 @@ wss.on("connection", (socket) => {
           // Send this user the room's recent history, just to them
           const history = await loadRoomHistory(roomId);
 
+          if (socket.readyState !== WebSocket.OPEN) {
+            return;
+          }
+
           socket.send(
             JSON.stringify({
               event: "room.history",
@@ -325,6 +321,7 @@ wss.on("connection", (socket) => {
               event: "room.message",
               data: {
                 id: saved.id,
+                roomId, // added: lets the client tell rooms apart
                 message: saved.text,
                 userId: saved.senderId,
                 createdAt: saved.createdAt,
@@ -360,9 +357,7 @@ wss.on("connection", (socket) => {
 
     socketStates.delete(socket);
 
-    console.log(
-      `User ${state.userId} disconnected`
-    );
+    console.log(`User ${state.userId} disconnected`);
   });
 });
 
@@ -382,21 +377,13 @@ server.on("upgrade", async (request, socket, head) => {
       return;
     }
 
-    wss.handleUpgrade(
-      request,
-      socket,
-      head,
-      (ws) => {
-        socketStates.set(ws, state);
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      socketStates.set(ws, state);
 
-        wss.emit("connection", ws, request);
-      }
-    );
+      wss.emit("connection", ws, request);
+    });
   } catch (error) {
-    console.error(
-      "WebSocket authentication failed:",
-      error
-    );
+    console.error("WebSocket authentication failed:", error);
 
     socket.write(
       "HTTP/1.1 500 Internal Server Error\r\n" +
@@ -409,7 +396,5 @@ server.on("upgrade", async (request, socket, head) => {
 });
 
 server.listen(3001, () => {
-  console.log(
-    "WebSocket server listening on http://localhost:3001"
-  );
+  console.log("WebSocket server listening on http://localhost:3001");
 });

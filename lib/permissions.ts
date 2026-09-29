@@ -10,12 +10,15 @@ export const permissions = [
 
   "users:read",
   "users:update",
+  "room:create",
+  "room:update",
+  "room:delete",
 ] as const
 
 export type Permission =
   (typeof permissions)[number]
 
-  export const rolePermissions: Record<
+export const rolePermissions: Record<
   string,
   Permission[]
 > = {
@@ -31,6 +34,10 @@ export type Permission =
 
     "users:read",
     "users:update",
+
+    "room:create",
+    "room:update",
+    "room:delete",
   ],
 
   CUSTOMER: [

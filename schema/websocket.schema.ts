@@ -15,6 +15,14 @@ const roomMessageSchema = z.object({
     })
 })
 
+export const createRoomSchema = z.object({
+    name: z
+    .string()
+    .trim()
+    .min(1 , "Room name is required")
+    .max(100 , "Room name cannot exceed 100 character")
+})
+
 export const websocketMessageSchema = z.discriminatedUnion(
     "event",
     [roomJoinSchema, roomMessageSchema]
