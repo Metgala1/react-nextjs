@@ -1,8 +1,30 @@
 import { createServer, IncomingMessage } from "http";
+import type { Duplex } from "stream";
 import { WebSocket, WebSocketServer } from "ws";
 import "dotenv/config";
 import { prisma } from "@/lib/prisma";
 import { websocketMessageSchema } from "./schema/websocket.schema";
+import { startRedisSubscriber } from "./websocket/redis-subscriber";
+
+/* -------------------------------------------------------------------------- */
+/* Config                                                                     */
+/* -------------------------------------------------------------------------- */
+
+const PORT = Number(process.env.WS_PORT ?? 3001);
+const ROOM_HISTORY_LIMIT = 50;
+const MAX_PAYLOAD_BYTES = 16 * 1024;
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
+// Comma-separated list, e.g. "http://localhost:3000,https://app.example.com".
+// Leave empty to skip the check (dev only).
+const ALLOWED_ORIGINS = (process.env.WS_ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+/* -------------------------------------------------------------------------- */
+/* Types & state                                                              */
+/* -------------------------------------------------------------------------- */
 
 type UserRole = "CUSTOMER" | "ADMIN";
 
@@ -12,21 +34,126 @@ type SocketState = {
   rooms: Set<string>;
 };
 
-const server = createServer();
-
-const wss = new WebSocketServer({
-  noServer: true,
-});
-
 // socket -> who is on the other end
 const socketStates = new Map<WebSocket, SocketState>();
 
 // roomId -> every socket currently listening to that room
 const rooms = new Map<string, Set<WebSocket>>();
 
-const ROOM_HISTORY_LIMIT = 50;
+// sockets that answered the last ping
+const alive = new WeakSet<WebSocket>();
 
-console.log("WebSocket server running on ws://localhost:3001");
+const server = createServer();
+
+const wss = new WebSocketServer({
+  noServer: true,
+  maxPayload: MAX_PAYLOAD_BYTES,
+});
+
+/* -------------------------------------------------------------------------- */
+/* Sending helpers                                                            */
+/* -------------------------------------------------------------------------- */
+
+function send(socket: WebSocket, event: string, data: unknown) {
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ event, data }));
+  }
+}
+
+function sendError(socket: WebSocket, message: string, roomId?: string) {
+  send(socket, "room.error", { roomId, message });
+}
+
+function broadcastToRoom(roomId: string, event: string, data: unknown) {
+  const sockets = rooms.get(roomId);
+
+  if (!sockets) {
+    return;
+  }
+
+  // Serialize once, not once per client
+  const payload = JSON.stringify({ event, data });
+
+  for (const client of sockets) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(payload);
+    }
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Room membership (in-memory)                                                */
+/* -------------------------------------------------------------------------- */
+
+function joinRoom(socket: WebSocket, roomId: string) {
+  let sockets = rooms.get(roomId);
+
+  if (!sockets) {
+    sockets = new Set();
+    rooms.set(roomId, sockets);
+  }
+
+  sockets.add(socket);
+  socketStates.get(socket)?.rooms.add(roomId);
+}
+
+function leaveRoom(socket: WebSocket, roomId: string) {
+  const sockets = rooms.get(roomId);
+
+  if (sockets) {
+    sockets.delete(socket);
+
+    if (sockets.size === 0) {
+      rooms.delete(roomId);
+    }
+  }
+
+  socketStates.get(socket)?.rooms.delete(roomId);
+}
+
+/**
+ * Kick every live connection of a user out of a room and tell them.
+ * Note: this only affects the process it runs in. If your Next.js API
+ * needs to trigger it, expose it through an internal endpoint or a
+ * pub/sub channel — the API can't call it directly.
+ */
+export function removeUserFromRoom(userId: number, roomId: string) {
+  for (const [socket, state] of socketStates) {
+    if (state.userId !== userId || !state.rooms.has(roomId)) {
+      continue;
+    }
+
+    send(socket, "room.removed", { roomId });
+    leaveRoom(socket, roomId);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Auth                                                                       */
+/* -------------------------------------------------------------------------- */
+
+function parseCookies(header: string): Record<string, string> {
+  const cookies: Record<string, string> = {};
+
+  for (const part of header.split(";")) {
+    const [name, ...rest] = part.trim().split("=");
+
+    if (!name) {
+      continue;
+    }
+
+    const raw = rest.join("=");
+
+    try {
+      cookies[name] = decodeURIComponent(raw);
+    } catch {
+      // Malformed encoding: keep the raw value rather than failing the upgrade
+      cookies[name] = raw;
+    }
+  }
+
+  return cookies;
+}
 
 async function authenticateSocket(
   request: IncomingMessage
@@ -37,24 +164,14 @@ async function authenticateSocket(
     return null;
   }
 
-  const cookies = Object.fromEntries(
-    cookieHeader.split(";").map((cookie) => {
-      const [name, ...value] = cookie.trim().split("=");
-
-      return [name, decodeURIComponent(value.join("="))];
-    })
-  );
-
-  const sessionId = cookies.session;
+  const sessionId = parseCookies(cookieHeader).session;
 
   if (!sessionId) {
     return null;
   }
 
   const session = await prisma.session.findUnique({
-    where: {
-      id: sessionId,
-    },
+    where: { id: sessionId },
     select: {
       id: true,
       expiresAt: true,
@@ -72,12 +189,8 @@ async function authenticateSocket(
   }
 
   if (session.expiresAt < new Date()) {
-    await prisma.session.delete({
-      where: {
-        id: session.id,
-      },
-    });
-
+    // deleteMany doesn't throw if another request already removed it
+    await prisma.session.deleteMany({ where: { id: session.id } });
     return null;
   }
 
@@ -103,12 +216,8 @@ async function authorizeRoomAccess(
 ): Promise<boolean> {
   if (state.role === "ADMIN") {
     const room = await prisma.room.findUnique({
-      where: {
-        id: roomId,
-      },
-      select: {
-        id: true,
-      },
+      where: { id: roomId },
+      select: { id: true },
     });
 
     return room !== null;
@@ -121,59 +230,20 @@ async function authorizeRoomAccess(
         roomId,
       },
     },
-    select: {
-      id: true,
-    },
+    select: { id: true },
   });
 
   return membership !== null;
 }
 
-function joinRoom(socket: WebSocket, roomId: string) {
-  if (!rooms.has(roomId)) {
-    rooms.set(roomId, new Set());
-  }
-
-  rooms.get(roomId)!.add(socket);
-
-  const state = socketStates.get(socket);
-
-  if (state) {
-    state.rooms.add(roomId);
-  }
+function rejectUpgrade(socket: Duplex, status: string) {
+  socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`);
+  socket.destroy();
 }
 
-function leaveRoom(socket: WebSocket, roomId: string) {
-  const room = rooms.get(roomId);
-
-  if (room) {
-    room.delete(socket);
-
-    if (room.size === 0) {
-      rooms.delete(roomId);
-    }
-  }
-
-  const state = socketStates.get(socket);
-
-  if (state) {
-    state.rooms.delete(roomId);
-  }
-}
-
-function broadcastToRoom(roomId: string, message: string) {
-  const room = rooms.get(roomId);
-
-  if (!room) {
-    return;
-  }
-
-  room.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(message);
-    }
-  });
-}
+/* -------------------------------------------------------------------------- */
+/* Data                                                                       */
+/* -------------------------------------------------------------------------- */
 
 /*
  * Most recent messages for a room, oldest first,
@@ -181,12 +251,8 @@ function broadcastToRoom(roomId: string, message: string) {
  */
 async function loadRoomHistory(roomId: string) {
   const messages = await prisma.message.findMany({
-    where: {
-      roomId,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
+    where: { roomId },
+    orderBy: { createdAt: "desc" },
     take: ROOM_HISTORY_LIMIT,
     select: {
       id: true,
@@ -199,17 +265,119 @@ async function loadRoomHistory(roomId: string) {
   return messages.reverse();
 }
 
-function sendError(socket: WebSocket, message: string, roomId?: string) {
-  socket.send(
-    JSON.stringify({
-      event: "room.error",
-      data: {
-        roomId,
-        message,
-      },
-    })
-  );
+/* -------------------------------------------------------------------------- */
+/* Event handlers                                                             */
+/* -------------------------------------------------------------------------- */
+
+async function handleJoin(
+  socket: WebSocket,
+  state: SocketState,
+  roomId: string
+) {
+  if (!(await authorizeRoomAccess(roomId, state))) {
+    sendError(socket, "You don't have access to this room", roomId);
+    return;
+  }
+
+  // The user may have disconnected while we were checking
+  // the database. Don't add a dead socket to the room.
+  if (socket.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  joinRoom(socket, roomId);
+  send(socket, "room.joined", { roomId });
+
+  // Send this user the room's recent history, just to them.
+  // Clients should de-duplicate by message id: a live message can
+  // arrive between the join and the history query.
+  const history = await loadRoomHistory(roomId);
+
+  send(socket, "room.history", {
+    roomId,
+    messages: history.map((msg) => ({
+      id: msg.id,
+      message: msg.text,
+      userId: msg.senderId,
+      createdAt: msg.createdAt,
+    })),
+  });
 }
+
+async function handleMessage(
+  socket: WebSocket,
+  state: SocketState,
+  roomId: string,
+  text: string
+) {
+  // Only people who successfully joined (and so passed
+  // the access check) can send into a room.
+  if (!state.rooms.has(roomId)) {
+    sendError(socket, "You have not joined this room", roomId);
+    return;
+  }
+
+  // Save first, so the message is never lost even if
+  // nobody else is online to receive the live broadcast.
+  const saved = await prisma.message.create({
+    data: {
+      roomId,
+      text,
+      senderId: state.userId,
+    },
+  });
+
+  broadcastToRoom(roomId, "room.message", {
+    id: saved.id,
+    roomId, // lets the client tell rooms apart
+    message: saved.text,
+    userId: saved.senderId,
+    createdAt: saved.createdAt,
+  });
+}
+
+async function handleIncoming(
+  socket: WebSocket,
+  state: SocketState,
+  raw: string
+) {
+  try {
+    const result = websocketMessageSchema.safeParse(JSON.parse(raw));
+
+    if (!result.success) {
+      sendError(socket, "Invalid message format");
+      return;
+    }
+
+    const payload = result.data;
+
+    switch (payload.event) {
+      case "room.join":
+        await handleJoin(socket, state, payload.data.roomId);
+        break;
+
+      case "room.message":
+        await handleMessage(
+          socket,
+          state,
+          payload.data.roomId,
+          payload.data.message
+        );
+        break;
+    }
+  } catch (error) {
+    console.error("Failed to handle message:", error);
+
+    sendError(
+      socket,
+      error instanceof SyntaxError ? "Invalid message" : "Something went wrong"
+    );
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Connection lifecycle                                                       */
+/* -------------------------------------------------------------------------- */
 
 wss.on("connection", (socket) => {
   const state = socketStates.get(socket);
@@ -221,180 +389,74 @@ wss.on("connection", (socket) => {
 
   console.log(`User ${state.userId} connected with role ${state.role}`);
 
+  alive.add(socket);
+  socket.on("pong", () => alive.add(socket));
+
   // Tell this browser its own real, server-verified user ID
-  socket.send(
-    JSON.stringify({
-      event: "identity",
-      data: {
-        userId: state.userId,
-      },
-    })
-  );
+  send(socket, "identity", { userId: state.userId });
 
-  socket.on("message", (message) => {
-    (async () => {
-      try {
-        const rawPayload = JSON.parse(message.toString());
+  socket.on("message", (data) => {
+    void handleIncoming(socket, state, data.toString());
+  });
 
-        const result = websocketMessageSchema.safeParse(rawPayload);
-
-        if (!result.success) {
-          sendError(socket, "Invalid message format");
-          return;
-        }
-
-        const payload = result.data;
-
-        if (payload.event === "room.join") {
-          const roomId = payload.data.roomId;
-
-          const authorized = await authorizeRoomAccess(roomId, state);
-
-          if (!authorized) {
-            sendError(socket, "You don't have access to this room", roomId);
-            return;
-          }
-
-          // The user may have disconnected while we were checking
-          // the database. Don't add a dead socket to the room.
-          if (socket.readyState !== WebSocket.OPEN) {
-            return;
-          }
-
-          joinRoom(socket, roomId);
-
-          socket.send(
-            JSON.stringify({
-              event: "room.joined",
-              data: {
-                roomId,
-              },
-            })
-          );
-
-          // Send this user the room's recent history, just to them
-          const history = await loadRoomHistory(roomId);
-
-          if (socket.readyState !== WebSocket.OPEN) {
-            return;
-          }
-
-          socket.send(
-            JSON.stringify({
-              event: "room.history",
-              data: {
-                roomId,
-                messages: history.map((msg) => ({
-                  id: msg.id,
-                  message: msg.text,
-                  userId: msg.senderId,
-                  createdAt: msg.createdAt,
-                })),
-              },
-            })
-          );
-        }
-
-        if (payload.event === "room.message") {
-          const roomId = payload.data.roomId;
-
-          // Only people who successfully joined (and so passed
-          // the access check) can send into a room.
-          if (!state.rooms.has(roomId)) {
-            sendError(socket, "You have not joined this room", roomId);
-            return;
-          }
-
-          // Save first, so the message is never lost even if
-          // nobody else is online to receive the live broadcast.
-          const saved = await prisma.message.create({
-            data: {
-              roomId,
-              text: payload.data.message,
-              senderId: state.userId,
-            },
-          });
-
-          broadcastToRoom(
-            roomId,
-            JSON.stringify({
-              event: "room.message",
-              data: {
-                id: saved.id,
-                roomId, // added: lets the client tell rooms apart
-                message: saved.text,
-                userId: saved.senderId,
-                createdAt: saved.createdAt,
-              },
-            })
-          );
-        }
-      } catch (error) {
-        console.error("Failed to handle message:", error);
-
-        sendError(
-          socket,
-          error instanceof SyntaxError
-            ? "Invalid message"
-            : "Something went wrong"
-        );
-      }
-    })();
+  socket.on("error", (error) => {
+    console.error(`Socket error for user ${state.userId}:`, error);
   });
 
   socket.on("close", () => {
-    const state = socketStates.get(socket);
-
-    if (!state) {
-      return;
+    for (const roomId of [...state.rooms]) {
+      leaveRoom(socket, roomId);
     }
 
-    const joinedRooms = [...state.rooms];
-
-    joinedRooms.forEach((roomId) => {
-      leaveRoom(socket, roomId);
-    });
-
     socketStates.delete(socket);
-
     console.log(`User ${state.userId} disconnected`);
   });
 });
 
+// Drop connections that stopped answering pings (closed laptops, dead networks)
+const heartbeat = setInterval(() => {
+  for (const socket of wss.clients) {
+    if (!alive.has(socket)) {
+      socket.terminate();
+      continue;
+    }
+
+    alive.delete(socket);
+    socket.ping();
+  }
+}, HEARTBEAT_INTERVAL_MS);
+
+wss.on("close", () => clearInterval(heartbeat));
+
 server.on("upgrade", async (request, socket, head) => {
   try {
+    // Cookies ride along on cross-site WebSocket handshakes, so check
+    // where the request came from before trusting the session.
+    if (
+      ALLOWED_ORIGINS.length > 0 &&
+      !ALLOWED_ORIGINS.includes(request.headers.origin ?? "")
+    ) {
+      rejectUpgrade(socket, "403 Forbidden");
+      return;
+    }
+
     const state = await authenticateSocket(request);
 
     if (!state) {
-      socket.write(
-        "HTTP/1.1 401 Unauthorized\r\n" +
-          "Connection: close\r\n" +
-          "\r\n"
-      );
-
-      socket.destroy();
-
+      rejectUpgrade(socket, "401 Unauthorized");
       return;
     }
 
     wss.handleUpgrade(request, socket, head, (ws) => {
       socketStates.set(ws, state);
-
       wss.emit("connection", ws, request);
     });
   } catch (error) {
     console.error("WebSocket authentication failed:", error);
-
-    socket.write(
-      "HTTP/1.1 500 Internal Server Error\r\n" +
-        "Connection: close\r\n" +
-        "\r\n"
-    );
-
-    socket.destroy();
+    rejectUpgrade(socket, "500 Internal Server Error");
   }
 });
 
-server.listen(3001, () => {
-  console.log("WebSocket server listening on http://localhost:3001");
+server.listen(PORT, () => {
+  console.log(`WebSocket server listening on ws://localhost:${PORT}`);
 });
