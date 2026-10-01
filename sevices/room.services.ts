@@ -1,6 +1,7 @@
 import { UserRole } from "@/app/generated/prisma/enums";
 import {prisma} from "@/lib/prisma"
 import { createRoomSchema } from "@/schema/websocket.schema";
+import { AppError } from "@/lib/errors";
 
 export async function createRoom(name: string, ownerId: number) {
   const parsedName = createRoomSchema.safeParse({ name })
@@ -54,15 +55,32 @@ export async function canManageRoom(
 }
 
 export async function addRoomMember(
-   roomId: string,
-   targetUserId: number
+    roomId: string,
+    targetUserId: number
 ) {
-    return  prisma.roomMember.create({
+    const user = await prisma.user.findUnique({
+        where: {
+            id: targetUserId
+        },
+        select: {
+            id: true
+        }
+    });
+
+    if (!user) {
+        throw new AppError(
+            "User not found",
+            404,
+            "USER_NOT_FOUND"
+        );
+    }
+
+    return prisma.roomMember.create({
         data: {
             roomId,
             userId: targetUserId
         }
-    })
+    });
 }
 
 export async function removeRoomMember(
@@ -80,22 +98,47 @@ export async function removeRoomMember(
 
 }
 
+
 export async function getRoomMembers(
-  roomId: string
+    roomId: string,
+    userId: number,
+    role: UserRole
 ) {
-  return prisma.roomMember.findMany({
-    where: {
-      roomId,
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          UserRole: true,
+    if (role !== "ADMIN") {
+        const membership = await prisma.roomMember.findUnique({
+            where: {
+                userId_roomId: {
+                    userId,
+                    roomId
+                }
+            },
+            select: {
+                userId: true
+            }
+        });
+
+        if (!membership) {
+            throw new AppError(
+                "You are not a member of this room",
+                403,
+                "FORBIDDEN"
+            );
+        }
+    }
+
+    return prisma.roomMember.findMany({
+        where: {
+            roomId
         },
-      },
-    },
-  });
+        include: {
+            user: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    UserRole: true
+                }
+            }
+        }
+    });
 }

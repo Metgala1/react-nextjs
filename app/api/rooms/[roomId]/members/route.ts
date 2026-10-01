@@ -1,14 +1,40 @@
-import { getRoomMembers } from "@/sevices/room.services";
+import { requireAuth } from "@/lib/auth";
+import { AppError } from "@/lib/errors";
+import { handleApiError } from "@/lib/handle-api-error";
 import { successResponse } from "@/lib/api-response";
-
+import { getRoomMembers } from "@/sevices/room.services";
 
 export async function GET(
-    request: Request,
-    roomId: Promise<{roomId: string}>
+    _request: Request,
+    {
+        params
+    }: {
+        params: Promise<{
+            roomId: string;
+        }>;
+    }
 ) {
-    const { roomId: id } = await roomId
-    const members = await getRoomMembers(id)
+    try {
+        const session = await requireAuth();
 
-    return successResponse(members, 200)
+        const { roomId } = await params;
 
+        if (!roomId.trim()) {
+            throw new AppError(
+                "Invalid room ID",
+                400,
+                "INVALID_ROOM_ID"
+            );
+        }
+
+        const members = await getRoomMembers(
+            roomId,
+            session.user.id,
+            session.user.UserRole
+        );
+
+        return successResponse(members);
+    } catch (error) {
+        return handleApiError(error);
+    }
 }

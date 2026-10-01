@@ -81,9 +81,24 @@ function broadcastToRoom(roomId: string, event: string, data: unknown) {
   }
 }
 
+function notifyUserAddedToRoom(
+    userId: number,
+    roomId: string
+) {
+    for (const [socket, state] of socketStates) {
+        if (state.userId !== userId) {
+            continue;
+        }
+
+        send(socket, "room.added", {
+            roomId,
+        });
+    }
+}
 /* -------------------------------------------------------------------------- */
 /* Room membership (in-memory)                                                */
 /* -------------------------------------------------------------------------- */
+
 
 function joinRoom(socket: WebSocket, roomId: string) {
   let sockets = rooms.get(roomId);
@@ -454,6 +469,29 @@ server.on("upgrade", async (request, socket, head) => {
   } catch (error) {
     console.error("WebSocket authentication failed:", error);
     rejectUpgrade(socket, "500 Internal Server Error");
+  }
+});
+
+void startRedisSubscriber((message) => {
+  try {
+    const event = JSON.parse(message);
+
+    if (event.type === "ROOM_MEMBER_REMOVED") {
+      removeUserFromRoom(
+        event.userId,
+        event.roomId
+      );
+     
+    }
+
+    if(event.type === "ROOM_MEMBER_ADDED") {
+      notifyUserAddedToRoom(event.userId, event.roomId)
+
+    }
+
+    console.log("Redis Event Received:", event.userId, event.roomId);
+  } catch (error) {
+    console.error("Failed to handle Redis event:", error);
   }
 });
 
