@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, requireAuth } from "@/lib/auth";
 import { successResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/handle-api-error";
 import { hasPermission } from "@/lib/permissions";
 import { createRoomSchema } from "@/schema/websocket.schema";
-import { createRoom } from "@/sevices/room.services";
+import { createRoom, getUserRooms  } from "@/sevices/room.services";
 
 export async function POST(request: Request) {
     try {
@@ -62,4 +62,20 @@ export async function POST(request: Request) {
     } catch (error) {
         return handleApiError(error);
     }
+}
+
+export async function GET(
+    request: Request
+) {
+    try{
+        const session = await requireAuth();
+
+        const rooms = await getUserRooms(session.user.id)
+
+        return successResponse(rooms, 200)
+
+    }catch(error) {
+        return handleApiError(error)
+    }
+
 }

@@ -142,3 +142,32 @@ export async function getRoomMembers(
         }
     });
 }
+
+export async function getUserRooms(userId: number) {
+  return prisma.room.findMany({
+    where: {
+      members: {
+        some: {
+          userId,
+        },
+      },
+    },
+
+    orderBy: {
+      createdAt: "desc",
+    },
+
+    select: {
+      id: true,
+      name: true,
+      ownerId: true,
+      createdAt: true,
+
+      _count: {
+        select: {
+          members: true,
+        },
+      },
+    },
+  });
+}
