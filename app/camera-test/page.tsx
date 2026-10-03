@@ -19,13 +19,17 @@ function describeError(err: unknown): string {
   return "Could not start the camera.";
 }
 
-function createPeerConnection(stream: MediaStream) {
-  const pc = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-    // Add a TURN server here for production. STUN alone fails on many mobile networks.
-  });
+async function createPeerConnection(stream: MediaStream) {
+  const pc = new RTCPeerConnection();
 
   stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+  // Create and set the local offer
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  
+  // In a real app, you would now send this offer to your signaling server
+  console.log("Created offer:", offer);
 
   return pc;
 }
@@ -41,7 +45,6 @@ export default function CameraTest() {
   const mountedRef = useRef(true);
 
   const stopCamera = useCallback(() => {
-    // Close the connection first, then release the hardware
     peerConnectionRef.current?.close();
     peerConnectionRef.current = null;
 
@@ -67,8 +70,6 @@ export default function CameraTest() {
         audio: true,
       });
 
-      // The component unmounted while the permission prompt was open:
-      // release the hardware immediately instead of leaking it.
       if (!mountedRef.current) {
         mediaStream.getTracks().forEach((track) => track.stop());
         return;
@@ -80,13 +81,12 @@ export default function CameraTest() {
         videoRef.current.srcObject = mediaStream;
       }
 
-      peerConnectionRef.current = createPeerConnection(mediaStream);
+      // Await the peer connection creation since it now handles the async offer
+      peerConnectionRef.current = await createPeerConnection(mediaStream);
 
       setIsOn(true);
     } catch (err) {
       console.error("Camera/microphone access failed:", err);
-      // Release anything that was set up before the failure, so the
-      // camera light goes off and the Start button works again.
       stopCamera();
       if (mountedRef.current) setError(describeError(err));
     } finally {
@@ -94,7 +94,6 @@ export default function CameraTest() {
     }
   };
 
-  // Runs once on mount, cleanup runs only on unmount.
   useEffect(() => {
     mountedRef.current = true;
 
