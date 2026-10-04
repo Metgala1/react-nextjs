@@ -40,6 +40,9 @@ const socketStates = new Map<WebSocket, SocketState>();
 // roomId -> every socket currently listening to that room
 const rooms = new Map<string, Set<WebSocket>>();
 
+// One active or ringing call per authenticated user in this process.
+const callPartners = new Map<number, number>();
+
 // sockets that answered the last ping
 const alive = new WeakSet<WebSocket>();
 
@@ -94,6 +97,130 @@ function notifyUserAddedToRoom(
             roomId,
         });
     }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Video call signaling                                                       */
+/* -------------------------------------------------------------------------- */
+
+type CallPayload = {
+  type: "call.initiate" | "call.accept" | "call.reject" | "call.offer" |
+    "call.answer" | "ice.candidate" | "call.end";
+  targetUserId?: number | string;
+  offer?: RTCSessionDescriptionInit;
+  answer?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit;
+};
+
+function sendCall(socket: WebSocket, type: string, data: Record<string, unknown> = {}) {
+  if (socket.readyState === WebSocket.OPEN) {
+    // VideoCall.tsx uses a flat { type, ... } protocol. Room messages keep
+    // their existing { event, data } envelope.
+    socket.send(JSON.stringify({ type, ...data }));
+  }
+}
+
+function sendCallError(socket: WebSocket, message: string) {
+  sendCall(socket, "call.error", { message });
+}
+
+function socketsForUser(userId: number): WebSocket[] {
+  return [...socketStates.entries()]
+    .filter(([socket, state]) => state.userId === userId && socket.readyState === WebSocket.OPEN)
+    .map(([socket]) => socket);
+}
+
+function sendCallToUser(userId: number, type: string, fromUserId: number, data: Record<string, unknown> = {}) {
+  for (const socket of socketsForUser(userId)) {
+    // String IDs match the browser's target ID input and avoid number/string
+    // comparison mismatches in the client.
+    sendCall(socket, type, { ...data, fromUserId: String(fromUserId) });
+  }
+}
+
+function parseTargetUserId(value: unknown): number | null {
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  const text = String(value).trim();
+  if (!/^\d+$/.test(text)) return null;
+  const id = Number(text);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+function isCallParticipant(userId: number, targetUserId: number): boolean {
+  return callPartners.get(userId) === targetUserId && callPartners.get(targetUserId) === userId;
+}
+
+function endCallFor(userId: number, notifyOther: boolean) {
+  const otherUserId = callPartners.get(userId);
+  if (otherUserId === undefined) return;
+  callPartners.delete(userId);
+  callPartners.delete(otherUserId);
+  if (notifyOther) sendCallToUser(otherUserId, "call.end", userId);
+}
+
+function handleCallMessage(socket: WebSocket, state: SocketState, payload: CallPayload): boolean {
+  if (!payload || typeof payload !== "object" || typeof payload.type !== "string" || !payload.type.startsWith("call.") && payload.type !== "ice.candidate") {
+    return false;
+  }
+  const callTypes = ["call.initiate", "call.accept", "call.reject", "call.offer", "call.answer", "ice.candidate", "call.end"];
+  if (!callTypes.includes(payload.type)) {
+    sendCallError(socket, "Unknown call signaling message");
+    return true;
+  }
+  const targetUserId = parseTargetUserId(payload.targetUserId);
+  if (targetUserId === null || targetUserId === state.userId) {
+    sendCallError(socket, "A valid other targetUserId is required");
+    return true;
+  }
+  if (socketsForUser(targetUserId).length === 0) {
+    sendCallError(socket, "That user is not connected");
+    return true;
+  }
+
+  if (payload.type === "call.initiate") {
+    if (callPartners.has(state.userId) || callPartners.has(targetUserId)) {
+      sendCallError(socket, "One of the users is already in a call");
+      return true;
+    }
+    callPartners.set(state.userId, targetUserId);
+    callPartners.set(targetUserId, state.userId);
+    sendCallToUser(targetUserId, "call.incoming", state.userId);
+    return true;
+  }
+
+  if (!isCallParticipant(state.userId, targetUserId)) {
+    sendCallError(socket, "No active call exists with that user");
+    return true;
+  }
+
+  if (payload.type === "call.end" || payload.type === "call.reject") {
+    const type = payload.type;
+    callPartners.delete(state.userId);
+    callPartners.delete(targetUserId);
+    sendCallToUser(targetUserId, type, state.userId);
+    return true;
+  }
+
+  if (payload.type === "call.accept") {
+    sendCallToUser(targetUserId, payload.type, state.userId);
+    return true;
+  }
+
+  if (payload.type === "call.offer" && payload.offer && typeof payload.offer === "object") {
+    sendCallToUser(targetUserId, payload.type, state.userId, { offer: payload.offer });
+    return true;
+  }
+  if (payload.type === "call.answer" && payload.answer && typeof payload.answer === "object") {
+    sendCallToUser(targetUserId, payload.type, state.userId, { answer: payload.answer });
+    return true;
+  }
+  if (payload.type === "ice.candidate" && payload.candidate && typeof payload.candidate === "object") {
+    sendCallToUser(targetUserId, payload.type, state.userId, { candidate: payload.candidate });
+    return true;
+  }
+
+  sendCallError(socket, `Invalid payload for ${payload.type}`);
+  return true;
 }
 /* -------------------------------------------------------------------------- */
 /* Room membership (in-memory)                                                */
@@ -357,36 +484,40 @@ async function handleIncoming(
   raw: string
 ) {
   try {
-    const result = websocketMessageSchema.safeParse(JSON.parse(raw));
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      sendError(socket, "Invalid message format");
+      return;
+    }
 
+    const object = parsed as Record<string, unknown>;
+    // VideoCall.tsx sends flat typed messages; route these independently from
+    // the existing room event envelope and Zod schema.
+    if (typeof object.type === "string") {
+      const handled = handleCallMessage(socket, state, object as CallPayload);
+      if (handled) return;
+      sendCallError(socket, "Unknown signaling message type");
+      return;
+    }
+
+    const result = websocketMessageSchema.safeParse(parsed);
     if (!result.success) {
       sendError(socket, "Invalid message format");
       return;
     }
 
     const payload = result.data;
-
     switch (payload.event) {
       case "room.join":
         await handleJoin(socket, state, payload.data.roomId);
         break;
-
       case "room.message":
-        await handleMessage(
-          socket,
-          state,
-          payload.data.roomId,
-          payload.data.message
-        );
+        await handleMessage(socket, state, payload.data.roomId, payload.data.message);
         break;
     }
   } catch (error) {
     console.error("Failed to handle message:", error);
-
-    sendError(
-      socket,
-      error instanceof SyntaxError ? "Invalid message" : "Something went wrong"
-    );
+    sendError(socket, error instanceof SyntaxError ? "Invalid message" : "Something went wrong");
   }
 }
 
@@ -419,6 +550,8 @@ wss.on("connection", (socket) => {
   });
 
   socket.on("close", () => {
+    // Calls are process-local; notify the other user if their peer vanished.
+    endCallFor(state.userId, true);
     for (const roomId of [...state.rooms]) {
       leaveRoom(socket, roomId);
     }
