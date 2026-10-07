@@ -1,0 +1,32 @@
+INVOICE
+----------------------------------------
+Date: [Insert Date]
+Invoice #: [Insert Number]
+
+BILL TO:
+[Client Name]
+[Client Address]
+[Client Email]
+
+FROM:
+[Your Company Name]
+[Your Address]
+[Your Email]
+----------------------------------------
+
+DESCRIPTION OF SERVICES/PRODUCTS
+----------------------------------------
+Item 1: [Service Name]           $0.00
+Item 2: [Service Name]           $0.00
+Item 3: [Service Name]           $0.00
+
+----------------------------------------
+SUBTOTAL:                       $0.00
+TAX (e.g., 10%):                 $0.00
+TOTAL DUE:                      $0.00
+
+----------------------------------------
+Payment Terms: Due within 14 days
+Payment Method: Bank Transfer / PayPal
+----------------------------------------
+Thank you for your business!
