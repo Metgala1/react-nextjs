@@ -58,6 +58,13 @@ function isServerMessage(value: unknown): value is ServerMessage {
     (message.type === "call.error" || ("fromUserId" in message));
 }
 
+
+
+
+//Main Component Below
+
+
+
 export default function VideoCall({ userId, signalingUrl }: Props) {
   const wsUrl = signalingUrl ?? process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:3001";
   const [status, setStatus] = useState<CallStatus>("idle");
