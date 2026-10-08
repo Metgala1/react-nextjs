@@ -1,5 +1,6 @@
 "use client"
 import { useState } from 'react';
+import VoiceInput from '@/components/VoiceInput';
 
 export default function DownloadTest() {
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -39,6 +40,9 @@ export default function DownloadTest() {
         <div>
             <h3>Download video</h3>
             <button onClick={handleDownload}>Download</button>
+            <div>
+                <VoiceInput />
+            </div>
             
             {/* Conditionally render the error message */}
             {errorMessage && (
