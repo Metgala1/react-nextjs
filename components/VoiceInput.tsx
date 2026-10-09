@@ -59,8 +59,12 @@ export default function VoiceInput({ lang = "en-US" }: { lang?: string }) {
 
     // Check support after mount (avoids SSR/hydration mismatch)
     useEffect(() => {
+        console.log("Component mounted")
         setSupported(getSpeechRecognition() !== null);
-        return () => recognitionRef.current?.abort();
+        return () => {
+            recognitionRef.current?.abort();
+            recognitionRef.current = null
+        }
     }, []);
 
     const start = useCallback(() => {
@@ -155,7 +159,9 @@ export default function VoiceInput({ lang = "en-US" }: { lang?: string }) {
                         }`}
                     >
                         {listening ? (
-                            <svg viewBox="0 0 24 24" fill="currentColor" className="h-7 w-7">
+                            <svg viewBox="0 0 24 24"
+                                 fill="currentColor" 
+                                 className="h-7 w-7">
                                 <rect x="6" y="6" width="12" height="12" rx="2" />
                             </svg>
                         ) : (
