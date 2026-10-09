@@ -24,9 +24,17 @@ const ERROR_MESSAGES: Partial<Record<AppSpeechRecognitionErrorCode, string>> = {
 };
 
 function getRecognitionConstructor(): AppSpeechRecognitionConstructor | null {
-    if (typeof window === "undefined") return null;
-    const w = window as unknown as SpeechRecognitionWindow;
-    return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+    if (typeof window === "undefined") {
+        return null;
+    }
+
+    const browserWindow = window as unknown as SpeechRecognitionWindow;
+
+    return (
+        browserWindow.SpeechRecognition ??
+        browserWindow.webkitSpeechRecognition ??
+        null
+    );
 }
 
 export function useSpeechRecognition({
@@ -42,11 +50,12 @@ export function useSpeechRecognition({
     const recognitionRef = useRef<AppSpeechRecognition | null>(null);
     const finalTranscriptRef = useRef("");
 
-    // Checked in an effect so server and client first render match (no hydration mismatch)
+    // Check browser support after mounting.
     useEffect(() => {
         setIsSupported(getRecognitionConstructor() !== null);
     }, []);
 
+    // Remove event handlers when a session is no longer active.
     const detach = useCallback((recognition: AppSpeechRecognition) => {
         recognition.onstart = null;
         recognition.onresult = null;
@@ -54,31 +63,58 @@ export function useSpeechRecognition({
         recognition.onend = null;
     }, []);
 
-    // Clean up on unmount
+    // Release the browser resource when the component unmounts.
     useEffect(() => {
         return () => {
             const recognition = recognitionRef.current;
-            if (!recognition) return;
+
             recognitionRef.current = null;
+
+            if (!recognition) {
+                return;
+            }
+
             detach(recognition);
-            recognition.abort();
+
+            try {
+                recognition.abort();
+            } catch {
+                // The recognition session may already have ended.
+            }
         };
     }, [detach]);
 
     const startListening = useCallback(() => {
-        if (recognitionRef.current) return;
+        // Do not start a second session while one is active.
+        if (recognitionRef.current) {
+            return;
+        }
 
         const Recognition = getRecognitionConstructor();
+
         if (!Recognition) {
-            setError("Speech recognition is not supported in this browser.");
+            setError(
+                "Speech recognition is not supported in this browser."
+            );
             setStatus("error");
             return;
         }
 
-        const recognition = new Recognition();
+        let recognition: AppSpeechRecognition;
+
+        try {
+            recognition = new Recognition();
+        } catch {
+            setError("Unable to create a speech recognition session.");
+            setStatus("error");
+            return;
+        }
+
         recognitionRef.current = recognition;
 
+        // Start each session with a fresh transcript.
         finalTranscriptRef.current = "";
+
         setText("");
         setInterimText("");
         setError("");
@@ -92,26 +128,38 @@ export function useSpeechRecognition({
         const isCurrent = () => recognitionRef.current === recognition;
 
         recognition.onstart = () => {
-            if (!isCurrent()) return;
+            if (!isCurrent()) {
+                return;
+            }
+
             setStatus("listening");
         };
 
         recognition.onresult = (event) => {
-            if (!isCurrent()) return;
+            if (!isCurrent()) {
+                return;
+            }
 
             let interim = "";
 
-            for (let i = event.resultIndex; i < event.results.length; i++) {
+            for (
+                let i = event.resultIndex;
+                i < event.results.length;
+                i++
+            ) {
                 const result = event.results[i];
                 const transcript = result[0].transcript;
 
                 if (result.isFinal) {
                     const current = finalTranscriptRef.current;
+
                     const needsSpace =
                         current.length > 0 &&
                         !current.endsWith(" ") &&
                         !transcript.startsWith(" ");
-                    finalTranscriptRef.current += (needsSpace ? " " : "") + transcript;
+
+                    finalTranscriptRef.current +=
+                        (needsSpace ? " " : "") + transcript;
                 } else {
                     interim += transcript;
                 }
@@ -122,53 +170,117 @@ export function useSpeechRecognition({
         };
 
         recognition.onerror = (event) => {
-            if (!isCurrent()) return;
+            if (!isCurrent()) {
+                return;
+            }
 
-            // abort() triggers "aborted", which isn't a real error
-            if (event.error === "aborted") return;
+            // Aborting is an intentional cancellation, not a user-facing error.
+            if (event.error === "aborted") {
+                return;
+            }
 
             setError(
                 ERROR_MESSAGES[event.error] ??
                     `Speech recognition error: ${event.error}`
             );
+
             setStatus("error");
         };
 
-        // onend always fires last (after stop, abort, or error)
         recognition.onend = () => {
-            if (!isCurrent()) return;
+            if (!isCurrent()) {
+                return;
+            }
 
             recognitionRef.current = null;
+
             setInterimText("");
-            setStatus((current) => (current === "error" ? "error" : "idle"));
+
+            // Do not erase an error reported by the browser.
+            setStatus((currentStatus) =>
+                currentStatus === "error" ? "error" : "idle"
+            );
         };
 
         try {
             recognition.start();
         } catch {
-            recognitionRef.current = null;
-            setStatus("error");
+            // Invalidate this session before attempting cleanup.
+            if (recognitionRef.current === recognition) {
+                recognitionRef.current = null;
+            }
+
+            detach(recognition);
+
+            try {
+                recognition.abort();
+            } catch {
+                // The session may never have started.
+            }
+
             setError("Unable to start speech recognition.");
+            setStatus("error");
         }
-    }, [lang, continuous]);
+    }, [lang, continuous, detach]);
 
     const stopListening = useCallback(() => {
         const recognition = recognitionRef.current;
-        if (!recognition) return;
+
+        if (!recognition) {
+            return;
+        }
 
         setStatus("stopping");
-        recognition.stop(); // onend will move status to "idle"
-    }, []);
+
+        try {
+            recognition.stop();
+        } catch {
+            if (recognitionRef.current === recognition) {
+                recognitionRef.current = null;
+            }
+
+            detach(recognition);
+
+            try {
+                recognition.abort();
+            } catch {
+                // The session may already be inactive.
+            }
+
+            setError("Unable to stop speech recognition.");
+            setStatus("error");
+        }
+    }, [detach]);
 
     const abortListening = useCallback(() => {
         const recognition = recognitionRef.current;
-        if (!recognition) return;
 
-        recognition.abort(); // onend will move status to "idle"
-    }, []);
+        if (!recognition) {
+            return;
+        }
+
+        // Aborting means discard the current transcript.
+        finalTranscriptRef.current = "";
+
+        setText("");
+        setInterimText("");
+        setStatus("stopping");
+
+        try {
+            recognition.abort();
+        } catch {
+            if (recognitionRef.current === recognition) {
+                recognitionRef.current = null;
+            }
+
+            detach(recognition);
+            setStatus("idle");
+        }
+    }, [detach]);
 
     const clearTranscript = useCallback(() => {
         finalTranscriptRef.current = "";
+
         setText("");
         setInterimText("");
     }, []);
