@@ -9,6 +9,8 @@ type Track = {
     streamUrl: string;
 };
 
+type RepeatMode = "off"|"all"|"one"
+
 function formatTime(seconds: number): string {
     if (!Number.isFinite(seconds) || seconds < 0) {
         return "0:00";
@@ -46,6 +48,8 @@ export default function AudioPlayer() {
 
     const currentTrack = tracks?.[currentTrackIndex];
     const canSkip = (tracks?.length ?? 0) > 1;
+    const [reapeatMode, setRepeatMode] = useState<RepeatMode>("off")
+    const [isShuffleEnabled , setIsShuffleEnabled] = useState(false)
 
     // Load the track list
     useEffect(() => {
@@ -118,6 +122,10 @@ export default function AudioPlayer() {
     function changeTrack(newIndex: number) {
         shouldAutoPlay.current = true;
         // Reset so the bar doesn't show the previous song's values
+        const audio = audioRef.current;
+
+        //This remembers if playbar was active
+        shouldAutoPlay.current = audio ? !audio.paused : false;
         setCurrentTime(0);
         setDuration(0);
         setCurrentTrackIndex(newIndex);
@@ -130,6 +138,14 @@ export default function AudioPlayer() {
 
     function handlePrevious() {
         if (!tracks || tracks.length < 2) return;
+        const audio = audioRef.current
+        if(!audio) {
+            return
+        }
+        if(audio.currentTime > 3) {
+            audio.currentTime = 0
+            return
+        }
         changeTrack((currentTrackIndex - 1 + tracks.length) % tracks.length);
     }
 
@@ -196,6 +212,52 @@ export default function AudioPlayer() {
         { label: "Progress", value: `${Math.round(progress)}%` },
     ];
 
+    function handleRepeatToggle() {
+        setRepeatMode((currentMode) => {
+            if (currentMode === "off") {
+                return "all";
+            }
+
+            if (currentMode === "all") {
+                return "one";
+            }
+
+            return "off";
+        });
+    }
+
+   function playNextTrack() {
+    shouldAutoPlay.current = true;
+
+    setCurrentTrackIndex((currentIndex) => {
+        return tracks ? (currentIndex + 1) % tracks.length : 0
+    });
+}
+
+    function handleTrackEnded() {
+        if (reapeatMode === "one") {
+            const audio = audioRef.current;
+
+            if (!audio) {
+                return;
+            }
+            audio.currentTime = 0;
+            audio.play().catch((error) => {
+                console.error("Could not replay track:", error);
+            });
+
+            return;
+        }
+
+        if(reapeatMode === "all") {
+            playNextTrack()
+            return
+            
+        }
+        setIsPlaying(false)
+        
+    }
+
     const skipButtonClass =
         "flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition-all duration-300 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/5 disabled:hover:text-slate-300 disabled:active:scale-100";
 
@@ -206,10 +268,7 @@ export default function AudioPlayer() {
                 src={currentTrack?.streamUrl}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
-                onEnded={() => {
-                    setIsPlaying(false);
-                    setCurrentTime(0);
-                }}
+                onEnded={handleTrackEnded}
                 onLoadedMetadata={(event) => {
                     const audio = event.currentTarget;
 
