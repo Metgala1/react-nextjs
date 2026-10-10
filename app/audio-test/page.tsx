@@ -1,6 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
+
+type Track = {
+    title: string;
+    id: number;
+    artist: string;
+    streamUrl: string;
+};
 
 function formatTime(seconds: number): string {
     if (!Number.isFinite(seconds) || seconds < 0) {
@@ -13,19 +20,81 @@ function formatTime(seconds: number): string {
     return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
+function getFileName(url: string): string {
+    const last = url.split("/").pop() ?? url;
+
+    try {
+        return decodeURIComponent(last);
+    } catch {
+        return last;
+    }
+}
+
 export default function AudioPlayer() {
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const progressRef = useRef<HTMLDivElement | null>(null);
+    // Set to true when the user switches tracks, so the new track starts playing
+    const shouldAutoPlay = useRef(false);
 
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [volume, setVolume] = useState(1);
     const [isMuted, setIsMuted] = useState(false);
+    const [tracks, setTracks] = useState<Track[] | null>(null);
+    const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+
+    const currentTrack = tracks?.[currentTrackIndex];
+    const canSkip = (tracks?.length ?? 0) > 1;
+
+    // Load the track list
+    useEffect(() => {
+        let isMounted = true;
+
+        async function loadTracks() {
+            try {
+                const response = await fetch("/api/tracks");
+
+                if (!response.ok) {
+                    return;
+                }
+
+                const data: Track[] = await response.json();
+
+                if (isMounted) {
+                    setTracks(data ?? null);
+                }
+            } catch (error) {
+                console.error("Failed to load tracks:", error);
+            }
+        }
+
+        void loadTracks();
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    // Start playing after the user switches tracks
+    useEffect(() => {
+        if (!shouldAutoPlay.current) return;
+        shouldAutoPlay.current = false;
+
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        audio.play().catch((error) => {
+            console.error("Could not play the selected track:", error);
+        });
+    }, [currentTrackIndex]);
 
     const progress =
         duration > 0
             ? Math.min((currentTime / duration) * 100, 100)
             : 0;
+
+    const remaining = duration > 0 ? Math.max(duration - currentTime, 0) : 0;
 
     // What the user sees and hears: 0 while muted
     const displayVolume = isMuted ? 0 : volume;
@@ -33,7 +102,7 @@ export default function AudioPlayer() {
     async function handlePlayPause() {
         const audio = audioRef.current;
 
-        if (!audio) return;
+        if (!audio || !currentTrack) return;
 
         if (audio.paused) {
             try {
@@ -44,6 +113,24 @@ export default function AudioPlayer() {
         } else {
             audio.pause();
         }
+    }
+
+    function changeTrack(newIndex: number) {
+        shouldAutoPlay.current = true;
+        // Reset so the bar doesn't show the previous song's values
+        setCurrentTime(0);
+        setDuration(0);
+        setCurrentTrackIndex(newIndex);
+    }
+
+    function handleNext() {
+        if (!tracks || tracks.length < 2) return;
+        changeTrack((currentTrackIndex + 1) % tracks.length);
+    }
+
+    function handlePrevious() {
+        if (!tracks || tracks.length < 2) return;
+        changeTrack((currentTrackIndex - 1 + tracks.length) % tracks.length);
     }
 
     function handleVolumeChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -82,11 +169,41 @@ export default function AudioPlayer() {
         }
     }
 
+    function handleSeek(event: React.MouseEvent) {
+        const audio = audioRef.current;
+        const progressBar = progressRef.current;
+
+        if (!audio || !progressBar || !Number.isFinite(audio.duration)) {
+            return;
+        }
+        const rect = progressBar.getBoundingClientRect();
+        const clickPosition = event.clientX - rect.left;
+
+        const fraction = Math.max(0, Math.min(clickPosition / rect.width, 1));
+
+        audio.currentTime = fraction * audio.duration;
+    }
+
+    const details = [
+        {
+            label: "Track",
+            value: tracks ? `${currentTrackIndex + 1} / ${tracks.length}` : "—",
+        },
+        { label: "Artist", value: currentTrack?.artist ?? "—" },
+        { label: "Elapsed", value: formatTime(currentTime) },
+        { label: "Remaining", value: `-${formatTime(remaining)}` },
+        { label: "Length", value: formatTime(duration) },
+        { label: "Progress", value: `${Math.round(progress)}%` },
+    ];
+
+    const skipButtonClass =
+        "flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition-all duration-300 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/5 disabled:hover:text-slate-300 disabled:active:scale-100";
+
     return (
         <div className="w-full max-w-sm rounded-[2rem] border border-white/10 bg-slate-900 p-7 shadow-2xl shadow-black/30">
             <audio
                 ref={audioRef}
-                src="/audio/migos.mp3"
+                src={currentTrack?.streamUrl}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
                 onEnded={() => {
@@ -102,6 +219,10 @@ export default function AudioPlayer() {
                 }}
                 onTimeUpdate={(event) => {
                     setCurrentTime(event.currentTarget.currentTime);
+                }}
+                onError={() => {
+                    setIsPlaying(false);
+                    console.error("Audio failed to load:", currentTrack?.streamUrl);
                 }}
             />
 
@@ -120,7 +241,7 @@ export default function AudioPlayer() {
 
                 {/* Album art */}
                 <div
-                    className={`mb-7 flex h-44 w-44 items-center justify-center rounded-3xl border border-white/10 bg-indigo-600 text-white shadow-xl shadow-black/40 transition-transform duration-700 ease-out ${
+                    className={`mb-6 flex h-44 w-44 items-center justify-center rounded-3xl border border-white/10 bg-indigo-600 text-white shadow-xl shadow-black/40 transition-transform duration-700 ease-out ${
                         isPlaying ? "scale-105" : "scale-100"
                     }`}
                 >
@@ -139,15 +260,28 @@ export default function AudioPlayer() {
                     </svg>
                 </div>
 
+                {/* Title and artist */}
+                <div className="mb-6 w-full text-center">
+                    <h2 className="truncate text-lg font-semibold tracking-tight text-white">
+                        {currentTrack?.title ?? "Loading track…"}
+                    </h2>
+                    <p className="mt-1 truncate text-sm text-slate-400">
+                        {currentTrack?.artist ?? "—"}
+                    </p>
+                </div>
+
                 {/* Progress */}
                 <div className="w-full">
                     <div
+                        ref={progressRef}
+                        onClick={handleSeek}
                         role="progressbar"
                         aria-label="Playback progress"
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={Math.round(progress)}
-                        className="relative h-1.5 w-full rounded-full bg-white/10"
+                        aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
+                        className="relative h-1.5 w-full cursor-pointer rounded-full bg-white/10"
                     >
                         <div
                             className="h-full rounded-full bg-indigo-400 transition-[width] duration-200 ease-linear"
@@ -162,28 +296,57 @@ export default function AudioPlayer() {
 
                     <div className="mt-3 flex justify-between text-xs font-medium tabular-nums text-slate-400">
                         <span>{formatTime(currentTime)}</span>
-                        <span>{formatTime(duration)}</span>
+                        <span>-{formatTime(remaining)}</span>
                     </div>
                 </div>
 
-                {/* Play / Pause */}
-                <button
-                    type="button"
-                    onClick={handlePlayPause}
-                    aria-label={isPlaying ? "Pause" : "Play"}
-                    className="group mt-6 flex h-16 w-16 items-center justify-center rounded-full bg-white text-slate-900 ring-4 ring-white/10 transition-all duration-300 hover:scale-105 hover:bg-slate-100 focus:outline-none focus-visible:ring-indigo-400/60 active:scale-95"
-                >
-                    {isPlaying ? (
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
-                            <rect x="6" y="5" width="4" height="14" rx="1.2" />
-                            <rect x="14" y="5" width="4" height="14" rx="1.2" />
+                {/* Controls: previous / play-pause / next */}
+                <div className="mt-6 flex items-center gap-5">
+                    <button
+                        type="button"
+                        onClick={handlePrevious}
+                        disabled={!canSkip}
+                        aria-label="Previous track"
+                        className={skipButtonClass}
+                    >
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+                            <path d="M18 5v14l-9-7z" />
+                            <rect x="5" y="5" width="2.5" height="14" rx="1" />
                         </svg>
-                    ) : (
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 h-6 w-6">
-                            <path d="M8 5v14l11-7z" />
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={handlePlayPause}
+                        disabled={!currentTrack}
+                        aria-label={isPlaying ? "Pause" : "Play"}
+                        className="group flex h-16 w-16 items-center justify-center rounded-full bg-white text-slate-900 ring-4 ring-white/10 transition-all duration-300 hover:scale-105 hover:bg-slate-100 focus:outline-none focus-visible:ring-indigo-400/60 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+                    >
+                        {isPlaying ? (
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
+                                <rect x="6" y="5" width="4" height="14" rx="1.2" />
+                                <rect x="14" y="5" width="4" height="14" rx="1.2" />
+                            </svg>
+                        ) : (
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 h-6 w-6">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                        )}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={handleNext}
+                        disabled={!canSkip}
+                        aria-label="Next track"
+                        className={skipButtonClass}
+                    >
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+                            <path d="M6 5v14l9-7z" />
+                            <rect x="16.5" y="5" width="2.5" height="14" rx="1" />
                         </svg>
-                    )}
-                </button>
+                    </button>
+                </div>
 
                 {/* Volume */}
                 <div className="mt-7 flex w-full items-center gap-3 border-t border-white/10 pt-5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
@@ -249,6 +412,28 @@ export default function AudioPlayer() {
                         {Math.round(displayVolume * 100)}%
                     </span>
                 </div>
+
+                {/* Track details */}
+                <dl className="mt-6 grid w-full grid-cols-2 gap-x-4 gap-y-3 border-t border-white/10 pt-5">
+                    {details.map((item) => (
+                        <div key={item.label} className="min-w-0">
+                            <dt className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                                {item.label}
+                            </dt>
+                            <dd className="mt-0.5 truncate text-sm font-medium tabular-nums text-slate-200">
+                                {item.value}
+                            </dd>
+                        </div>
+                    ))}
+                    <div className="col-span-2 min-w-0">
+                        <dt className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            File
+                        </dt>
+                        <dd className="mt-0.5 truncate text-sm font-medium text-slate-200">
+                            {currentTrack ? getFileName(currentTrack.streamUrl) : "—"}
+                        </dd>
+                    </div>
+                </dl>
             </div>
         </div>
     );
