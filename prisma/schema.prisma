@@ -118,3 +118,13 @@ model RoomMember {
   @@index([roomId])
 }
 
+model Recording {
+  id         String   @id @default(cuid())
+  title      String?
+  data       Bytes              // the raw audio
+  mimeType   String
+  sizeBytes  Int
+  durationMs Int?
+  createdAt  DateTime @default(now())
+}
+

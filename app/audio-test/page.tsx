@@ -9,7 +9,7 @@ type Track = {
     streamUrl: string;
 };
 
-type RepeatMode = "off"|"all"|"one"
+type RepeatMode = "off" | "all" | "one";
 
 function formatTime(seconds: number): string {
     if (!Number.isFinite(seconds) || seconds < 0) {
@@ -35,7 +35,7 @@ function getFileName(url: string): string {
 export default function AudioPlayer() {
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const progressRef = useRef<HTMLDivElement | null>(null);
-    // Set to true when the user switches tracks, so the new track starts playing
+    // Set to true when the track changes, so the new track starts playing
     const shouldAutoPlay = useRef(false);
 
     const [isPlaying, setIsPlaying] = useState(false);
@@ -45,11 +45,11 @@ export default function AudioPlayer() {
     const [isMuted, setIsMuted] = useState(false);
     const [tracks, setTracks] = useState<Track[] | null>(null);
     const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+    const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
+    const [isShuffleEnabled, setIsShuffleEnabled] = useState(false);
 
     const currentTrack = tracks?.[currentTrackIndex];
     const canSkip = (tracks?.length ?? 0) > 1;
-    const [reapeatMode, setRepeatMode] = useState<RepeatMode>("off")
-    const [isShuffleEnabled , setIsShuffleEnabled] = useState(false)
 
     // Load the track list
     useEffect(() => {
@@ -80,7 +80,7 @@ export default function AudioPlayer() {
         };
     }, []);
 
-    // Start playing after the user switches tracks
+    // Start playing after the track changes
     useEffect(() => {
         if (!shouldAutoPlay.current) return;
         shouldAutoPlay.current = false;
@@ -120,31 +120,47 @@ export default function AudioPlayer() {
     }
 
     function changeTrack(newIndex: number) {
-        shouldAutoPlay.current = true;
-        // Reset so the bar doesn't show the previous song's values
         const audio = audioRef.current;
 
-        //This remembers if playbar was active
+        // Keep playing if the player was playing
         shouldAutoPlay.current = audio ? !audio.paused : false;
+        // Reset so the bar doesn't show the previous song's values
         setCurrentTime(0);
         setDuration(0);
         setCurrentTrackIndex(newIndex);
     }
 
+    // Next index: random (never the same track) when shuffle is on, otherwise in order
+    function getNextIndex(): number {
+        if (!tracks || tracks.length === 0) return 0;
+
+        if (isShuffleEnabled && tracks.length > 1) {
+            let randomIndex = currentTrackIndex;
+
+            while (randomIndex === currentTrackIndex) {
+                randomIndex = Math.floor(Math.random() * tracks.length);
+            }
+
+            return randomIndex;
+        }
+
+        return (currentTrackIndex + 1) % tracks.length;
+    }
+
     function handleNext() {
         if (!tracks || tracks.length < 2) return;
-        changeTrack((currentTrackIndex + 1) % tracks.length);
+        changeTrack(getNextIndex());
     }
 
     function handlePrevious() {
         if (!tracks || tracks.length < 2) return;
-        const audio = audioRef.current
-        if(!audio) {
-            return
-        }
-        if(audio.currentTime > 3) {
-            audio.currentTime = 0
-            return
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        // Restart the current song if it's been playing for a few seconds
+        if (audio.currentTime > 3) {
+            audio.currentTime = 0;
+            return;
         }
         changeTrack((currentTrackIndex - 1 + tracks.length) % tracks.length);
     }
@@ -200,42 +216,40 @@ export default function AudioPlayer() {
         audio.currentTime = fraction * audio.duration;
     }
 
-    const details = [
-        {
-            label: "Track",
-            value: tracks ? `${currentTrackIndex + 1} / ${tracks.length}` : "—",
-        },
-        { label: "Artist", value: currentTrack?.artist ?? "—" },
-        { label: "Elapsed", value: formatTime(currentTime) },
-        { label: "Remaining", value: `-${formatTime(remaining)}` },
-        { label: "Length", value: formatTime(duration) },
-        { label: "Progress", value: `${Math.round(progress)}%` },
-    ];
-
     function handleRepeatToggle() {
         setRepeatMode((currentMode) => {
-            if (currentMode === "off") {
-                return "all";
-            }
-
-            if (currentMode === "all") {
-                return "one";
-            }
-
+            if (currentMode === "off") return "all";
+            if (currentMode === "all") return "one";
             return "off";
         });
     }
 
-   function playNextTrack() {
-    shouldAutoPlay.current = true;
+    function handleShuffleToggle() {
+        setIsShuffleEnabled((currentValue) => !currentValue);
+    }
 
-    setCurrentTrackIndex((currentIndex) => {
-        return tracks ? (currentIndex + 1) % tracks.length : 0
-    });
-}
+    // Used when a song ends on its own (repeat "all")
+    function playNextTrack() {
+        const audio = audioRef.current;
+
+        // With a single track there's no new source, so just replay it
+        if (!tracks || tracks.length < 2) {
+            if (!audio) return;
+            audio.currentTime = 0;
+            audio.play().catch((error) => {
+                console.error("Could not replay track:", error);
+            });
+            return;
+        }
+
+        shouldAutoPlay.current = true;
+        setCurrentTime(0);
+        setDuration(0);
+        setCurrentTrackIndex(getNextIndex());
+    }
 
     function handleTrackEnded() {
-        if (reapeatMode === "one") {
+        if (repeatMode === "one") {
             const audio = audioRef.current;
 
             if (!audio) {
@@ -249,17 +263,42 @@ export default function AudioPlayer() {
             return;
         }
 
-        if(reapeatMode === "all") {
-            playNextTrack()
-            return
-            
+        if (repeatMode === "all") {
+            playNextTrack();
+            return;
         }
-        setIsPlaying(false)
-        
+
+        setIsPlaying(false);
     }
+
+    const repeatLabel =
+        repeatMode === "off"
+            ? "Repeat: off"
+            : repeatMode === "all"
+              ? "Repeat: all tracks"
+              : "Repeat: current track";
+
+    const details = [
+        {
+            label: "Track",
+            value: tracks ? `${currentTrackIndex + 1} / ${tracks.length}` : "—",
+        },
+        { label: "Artist", value: currentTrack?.artist ?? "—" },
+        { label: "Elapsed", value: formatTime(currentTime) },
+        { label: "Remaining", value: `-${formatTime(remaining)}` },
+        { label: "Length", value: formatTime(duration) },
+        { label: "Progress", value: `${Math.round(progress)}%` },
+    ];
 
     const skipButtonClass =
         "flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition-all duration-300 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/5 disabled:hover:text-slate-300 disabled:active:scale-100";
+
+    const toggleButtonClass = (active: boolean) =>
+        `flex h-10 w-10 items-center justify-center rounded-full transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 ${
+            active
+                ? "bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25"
+                : "text-slate-500 hover:bg-white/10 hover:text-slate-200"
+        }`;
 
     return (
         <div className="w-full max-w-sm rounded-[2rem] border border-white/10 bg-slate-900 p-7 shadow-2xl shadow-black/30">
@@ -359,8 +398,37 @@ export default function AudioPlayer() {
                     </div>
                 </div>
 
-                {/* Controls: previous / play-pause / next */}
-                <div className="mt-6 flex items-center gap-5">
+                {/* Controls: shuffle / previous / play-pause / next / repeat */}
+                <div className="mt-6 flex items-center gap-3">
+                    {/* Shuffle */}
+                    <button
+                        type="button"
+                        onClick={handleShuffleToggle}
+                        disabled={!canSkip}
+                        aria-label={isShuffleEnabled ? "Shuffle: on" : "Shuffle: off"}
+                        aria-pressed={isShuffleEnabled}
+                        title={isShuffleEnabled ? "Shuffle: on" : "Shuffle: off"}
+                        className={toggleButtonClass(isShuffleEnabled)}
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="h-[18px] w-[18px]"
+                            aria-hidden="true"
+                        >
+                            <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22" />
+                            <path d="m18 2 4 4-4 4" />
+                            <path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2" />
+                            <path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8" />
+                            <path d="m18 14 4 4-4 4" />
+                        </svg>
+                    </button>
+
+                    {/* Previous */}
                     <button
                         type="button"
                         onClick={handlePrevious}
@@ -374,6 +442,7 @@ export default function AudioPlayer() {
                         </svg>
                     </button>
 
+                    {/* Play / Pause */}
                     <button
                         type="button"
                         onClick={handlePlayPause}
@@ -393,6 +462,7 @@ export default function AudioPlayer() {
                         )}
                     </button>
 
+                    {/* Next */}
                     <button
                         type="button"
                         onClick={handleNext}
@@ -403,6 +473,33 @@ export default function AudioPlayer() {
                         <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
                             <path d="M6 5v14l9-7z" />
                             <rect x="16.5" y="5" width="2.5" height="14" rx="1" />
+                        </svg>
+                    </button>
+
+                    {/* Repeat */}
+                    <button
+                        type="button"
+                        onClick={handleRepeatToggle}
+                        aria-label={repeatLabel}
+                        aria-pressed={repeatMode !== "off"}
+                        title={repeatLabel}
+                        className={toggleButtonClass(repeatMode !== "off")}
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="h-[18px] w-[18px]"
+                            aria-hidden="true"
+                        >
+                            <path d="m17 2 4 4-4 4" />
+                            <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+                            <path d="m7 22-4-4 4-4" />
+                            <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+                            {repeatMode === "one" && <path d="M11 10h1v4" />}
                         </svg>
                     </button>
                 </div>
