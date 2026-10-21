@@ -128,3 +128,28 @@ model Recording {
   createdAt  DateTime @default(now())
 }
 
+enum VideoStatus {
+  PENDING   // row created, upload not finished yet
+  UPLOADED  // file is safely in storage
+  FAILED    // upload failed (see errorMessage)
+}
+
+model Video {
+  id          String   @id @default(cuid())
+  title       String?
+  bucket      String   @default("videos")
+  storagePath String   @unique   // e.g. "recordings/3f2a...webm"
+  mimeType    String             // "video/webm" or "video/mp4"
+  sizeBytes   Int
+  durationMs  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Uncomment once you have users:
+  // userId String
+  // user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // @@index([userId])
+
+  @@index([createdAt])
+}
+

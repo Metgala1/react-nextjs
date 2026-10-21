@@ -17,6 +17,9 @@ export default function VideoCapture() {
     const [error, setError] = useState("")
     const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
 
+    const [isUploading, setIsUploading] = useState(false)
+    const [uploadedPath, setUploadedPath] = useState<string | null>(null)
+
         function getMediaErrorMessage(error: unknown): string {
             if (!(error instanceof Error)) {
                 return "An unexpected media error occurred.";
@@ -191,6 +194,38 @@ export default function VideoCapture() {
             setIsCameraOn(false)
 
         }
+    
+    async function uploadRecording() {
+        if(!recordedBlob || isUploading) {
+            return
+        }
+
+        setError("")
+        setIsUploading(true)
+
+        try{
+            const formData = new FormData()
+            formData.append("video", recordedBlob, `recording.${recordedExtension}`)
+
+            const response = await fetch("api/videos", {
+                method: "POST",
+                body: formData
+            })
+
+            const body = await response.json().catch(() => null)
+
+            if(!response.ok) {
+                throw new Error(body?.error ?? "Failed to upload video.")
+            }
+
+            setUploadedPath(body.path)
+        }catch(error) {
+            console.error("Upload failed:", error)
+            setError(error instanceof Error ? error.message: "Failed to upload video.")
+        }finally {
+            setIsUploading(false)
+        }
+    }
      useEffect(() => {
             return () => {
                 const recorder = recorderRef.current
@@ -340,13 +375,34 @@ export default function VideoCapture() {
               src={recordedUrl}
               className="aspect-video w-full rounded-xl bg-gray-900 ring-1 ring-gray-200"
             />
-            <a
-              href={recordedUrl}
-              download={`my-video.${recordedExtension}`}
-              className="mt-3 flex w-full items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5 font-semibold text-indigo-700 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 active:scale-95"
-            >
-              Download video
-            </a>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                <button
+                    type="button"
+                    onClick={uploadRecording}
+                    disabled={!recordedBlob || isUploading || uploadedPath !== null}
+                    className="flex-1 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white transition focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 enabled:hover:bg-indigo-700 enabled:active:scale-95 disabled:cursor-not-allowed disabled:bg-indigo-300"
+                >
+                    {isUploading
+                    ? "Uploading..."
+                    : uploadedPath
+                        ? "Uploaded ✓"
+                        : "Upload video"}
+                </button>
+
+                <a
+                    href={recordedUrl}
+                    download={`my-video.${recordedExtension}`}
+                    className="flex flex-1 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5 font-semibold text-indigo-700 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 active:scale-95"
+                >
+                    Download video
+                </a>
+                </div>
+
+                {uploadedPath && (
+                <p className="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-center text-sm font-medium text-green-700">
+                    Video saved successfully.
+                </p>
+                )}
           </div>
         )}
       </section>

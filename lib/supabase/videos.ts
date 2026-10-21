@@ -1,6 +1,7 @@
+// lib/supabase/videos.ts
 import { createAdminClient } from "./admin";
 
-const BUCKET = "videos";
+export const VIDEO_BUCKET = "videos";
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50 MB (Supabase's default per-file cap)
 
 const ALLOWED_VIDEO_TYPES: Record<string, string> = {
@@ -8,34 +9,52 @@ const ALLOWED_VIDEO_TYPES: Record<string, string> = {
   "video/mp4": "mp4",
 };
 
-export type UploadVideoResult =
-  | { success: true; path: string }
+export type ValidateVideoResult =
+  | { ok: true; contentType: string; extension: string }
+  | { ok: false; message: string };
+
+export type UploadToStorageResult =
+  | { success: true }
   | { success: false; message: string };
 
-export async function uploadVideo(video: File): Promise<UploadVideoResult> {
+// Step 1: check the file before touching the database or storage.
+export function validateVideo(video: File): ValidateVideoResult {
   // MediaRecorder types look like "video/webm;codecs=vp9". Keep the base type.
   const contentType = video.type.split(";")[0].trim();
   const extension = ALLOWED_VIDEO_TYPES[contentType];
 
   if (!extension) {
-    return { success: false, message: "Only WebM and MP4 videos are allowed" };
+    return { ok: false, message: "Only WebM and MP4 videos are allowed" };
   }
 
   if (video.size === 0) {
-    return { success: false, message: "The video is empty" };
+    return { ok: false, message: "The video is empty" };
   }
 
   if (video.size > MAX_VIDEO_SIZE) {
-    return { success: false, message: "Video must be smaller than 50mb" };
+    return { ok: false, message: "Video must be smaller than 50mb" };
   }
 
+  return { ok: true, contentType, extension };
+}
 
-  const filePath = `recordings/${crypto.randomUUID()}.${extension}`;
+// Step 2: build the storage path up front so it can be saved on the
+// database row before the upload starts.
+export function createVideoPath(extension: string): string {
+  return `recordings/${crypto.randomUUID()}.${extension}`;
+}
 
+// Step 3: upload the file to exactly that path.
+export async function uploadVideoToStorage(
+  video: File,
+  path: string,
+  contentType: string
+): Promise<UploadToStorageResult> {
   const supabase = createAdminClient();
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .upload(filePath, video, {
+
+  const { error } = await supabase.storage
+    .from(VIDEO_BUCKET)
+    .upload(path, video, {
       contentType,
       upsert: false,
     });
@@ -45,7 +64,7 @@ export async function uploadVideo(video: File): Promise<UploadVideoResult> {
     return { success: false, message: "Failed to upload video" };
   }
 
-  return { success: true, path: data.path };
+  return { success: true };
 }
 
 // The bucket is private, so playback needs a temporary signed URL.
@@ -54,8 +73,9 @@ export async function getVideoUrl(
   expiresInSeconds = 60 * 60
 ): Promise<string | null> {
   const supabase = createAdminClient();
+
   const { data, error } = await supabase.storage
-    .from(BUCKET)
+    .from(VIDEO_BUCKET)
     .createSignedUrl(path, expiresInSeconds);
 
   if (error) {
@@ -72,9 +92,38 @@ export async function deleteVideo(
   if (!path) return;
 
   const supabase = createAdminClient();
-  const { error } = await supabase.storage.from(BUCKET).remove([path]);
+  const { error } = await supabase.storage.from(VIDEO_BUCKET).remove([path]);
 
   if (error) {
     console.error("Failed to delete video:", error);
   }
+}
+
+// Sign many paths in one request. Returns a map of path -> signed URL.
+export async function getVideoUrls(
+  paths: string[],
+  expiresInSeconds = 60 * 60
+): Promise<Record<string, string>> {
+  if (paths.length === 0) return {};
+
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase.storage
+    .from(VIDEO_BUCKET)
+    .createSignedUrls(paths, expiresInSeconds);
+
+  if (error || !data) {
+    console.error("Failed to create signed URLs:", error);
+    return {};
+  }
+
+  const urls: Record<string, string> = {};
+
+  for (const item of data) {
+    if (item.path && item.signedUrl) {
+      urls[item.path] = item.signedUrl;
+    }
+  }
+
+  return urls;
 }
