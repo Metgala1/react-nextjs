@@ -1,10 +1,10 @@
 // app/about/page.tsx
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "About | StoreFront",
-  description: "Learn more about StoreFront and our mission to bring you the best technology.",
-};
+export const metadata:Metadata = {
+    title: "About Us",
+    description: "Learn more about StoreFront and our mission to bring you the best technology."
+}
 
 export default function AboutPage() {
     return (

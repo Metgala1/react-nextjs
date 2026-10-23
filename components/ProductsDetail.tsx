@@ -18,6 +18,7 @@ export default async function ProductDetails(product: Product) {
                                 alt={product.name}
                                 className="object-cover w-full h-full max-h-[450px] rounded-2xl shadow-md"
                                 fill
+                                loading="eager"
                             />
                         ) : (
                             <div className="flex flex-col items-center justify-center text-slate-400 space-y-2">

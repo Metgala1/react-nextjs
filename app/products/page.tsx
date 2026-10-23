@@ -6,7 +6,7 @@ import PaginationBar from "@/components/PaginationBar";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Products | StoreFront",
+    title: "Products",
     description: "Explore and discover our variety of products"
 }
 

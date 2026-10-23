@@ -2,10 +2,26 @@ import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import ModalClose from "@/components/ModalClose";
+import type { Metadata } from "next";
+import { getProductById } from "@/sevices/product.service";
 
 type Props = {
   params: Promise<{ id: string }>;
 };
+
+export async function generateMetadata({params,} : {params : Promise<{id: string}>}):Promise<Metadata> {
+  const {id} = await params
+
+  const product = await getProductById(Number(id))
+  if(!product) {
+    notFound()
+  }
+
+  return {
+    title: product.name,
+    description: product.description?.trim() || `Explore ${product.name} on StoreFront`
+  }
+}
 
 export default async function ProductModal({ params }: Props) {
   const { id } = await params;

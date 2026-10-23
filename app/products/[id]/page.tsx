@@ -5,29 +5,99 @@ import type { Metadata } from "next";
 import { deleteProduct } from "@/actions/products.action";
 import { getProductImageUrl } from "@/lib/supabase/storage";
 import Image from "next/image";
+import {cache} from "react"
+import { AppError } from "@/lib/errors";
 
 type Props = {
     params: Promise<{ id: string }>;
 };
 
-// SEO generation for products details ppage 
-export async function generateMetadata({params,}: Props): Promise<Metadata> {
-  const { id } = await params
-  
 
-  const productId = Number(id)
-  const product = await getProductById(productId)
+const siteUrl = (
+    process.env.SITE_URL ?? "http://localhost:3000"
+    ).replace(/\/$/, "");
+const getCachedProduct = cache(async (id: string) => {
+    return getProductById(Number(id))
+})
 
-  if (!product) {
-    return {
-      title: "Product Not Found",
+async function getProductOrNotFound(id: string) {
+  try {
+    return await getCachedProduct(id);
+  } catch (error) {
+    if (
+      error instanceof AppError &&
+      error.code === "PRODUCT_NOT_FOUND"
+    ) {
+      notFound();
     }
-  }
 
-  return {
-    title: `${product.name} | StoreFront`,
-    description: `Buy ${product.name} from StoreFront.`,
+    throw error;
   }
+}
+
+// SEO generation for products details page 
+export async function generateMetadata({params,} : Props):Promise<Metadata> {
+    const {id} = await params;
+    const product = await getProductOrNotFound(id)
+
+    if(!product) {
+        notFound()
+    }
+
+    
+
+    const productUrl = `${siteUrl}/products/${id}`;
+
+    const description = product.description?.trim() || `Explore ${product.name} on StoreFront.`
+    const imageUrl = product.image ? await getProductImageUrl(product.image) : null
+
+    return {
+        // <title> in the browser tab and the headline in Google results.
+        title: product.name,
+        // Snippet shown under the title in search results (<meta name="description">).
+        description,
+
+        
+        alternates: {
+        // Canonical URL: tells search engines this is the "official" address of the page.
+        // The same product can be reached through other URLs (query strings like
+        // ?ref=email, tracking params, filters), and without this Google may treat
+        // them as duplicate pages and split the ranking between them.
+        // Resolved against metadataBase from the root layout, hence the leading slash.
+            canonical: `/products/${id}`
+        }, 
+
+        // Open Graph: controls the preview card shown when the link is shared
+        // on WhatsApp, Facebook, LinkedIn, Slack, etc.
+        openGraph: {
+            // Card title. Includes the site name so the brand shows in shares,
+        // while the plain <title> above stays short for search results.
+            title: `${product.name} | StoreFront`,
+            // Text under the card title; reuses the same description as the page.
+            description,
+            // What the content is. "website" is the generic type;
+        // "article" or "product" exist for more specific content.
+
+            type: "website",
+            // The URL the card links to. Should match the canonical URL so shares
+        // from different links all count as the same page.
+            url: productUrl,
+
+            // Only add the image when the product has one. The && returns a falsy value
+        // when imageUrl is null, and spreading a falsy value adds nothing, so the
+        // `images` key is skipped instead of being set to an invalid value.
+        // imageUrl must be awaited first, because a Promise breaks the types.
+            ...(imageUrl && {
+                images: [
+                    {
+                        url: imageUrl,
+                        // Alt text for accessibility, and shown if the image fails to load.
+                        alt: product.name,
+                    }
+                ]
+            })
+        }
+    }
 }
 
 export default async function ProductDetail({ params }: Props) {
@@ -37,7 +107,7 @@ export default async function ProductDetail({ params }: Props) {
         notFound()
     }
 
-    const product = await getProductById(Number(id));
+    const product = await getProductOrNotFound(id)
 
     if (!product) {
         notFound();
@@ -46,11 +116,43 @@ export default async function ProductDetail({ params }: Props) {
     const imageUrl = await getProductImageUrl(product.image)
 
     const deleteProd = deleteProduct.bind(null, product.id);
+
+    const description =
+    product.description?.trim() ||
+    `Explore ${product.name} on StoreFront.`;
+
+    const productUrl = `${siteUrl}/products/${id}`;
+
+    
+    const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description,
+    url: productUrl,
+    ...(imageUrl && { image: [imageUrl] }),
+
+    offers: {
+    "@type": "Offer",
+    price: product.price,
+    priceCurrency: "USD",
+    availability:
+        product.quantity > 0
+        ? "https://schema.org/InStock"
+        : "https://schema.org/OutOfStock",
+    },
+    };
    
    
 
     return (
-        <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+        <main className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+            <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+                __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
+            }}
+            />
             <div className="max-w-5xl mx-auto">
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden grid grid-cols-1 md:grid-cols-2">
 
@@ -59,8 +161,9 @@ export default async function ProductDetail({ params }: Props) {
                         <Image
                             src={imageUrl}
                             alt={product.name}
-                            className="object-cover w-full h-full max-h-[450px] rounded-2xl shadow-md"
                             fill
+                            sizes="(max-width: 767px) calc(100vw - 4rem), 50vw"
+                            className="object-cover rounded-2xl shadow-md"
                         />
 
                         <span className="absolute top-6 left-6 bg-white/90 backdrop-blur-md text-slate-800 text-xs font-semibold px-3 py-1.5 rounded-full shadow-xs">
@@ -120,7 +223,7 @@ export default async function ProductDetail({ params }: Props) {
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
     );
 }
 

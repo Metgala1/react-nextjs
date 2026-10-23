@@ -14,9 +14,10 @@ export default async function ProductCard({ product }: { product: Product }) {
                     {product.image ? (
                         <Image
                             src={imageUrl}
-                            alt={product.name}
+                            alt={`Photo of ${product.name}`}
                             className="object-cover w-full h-full rounded-2xl group-hover:scale-105 transition-transform duration-500"
                             fill
+                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                         />
                     ) : (
                         <div>No Image</div>
