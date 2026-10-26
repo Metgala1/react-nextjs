@@ -1,12 +1,24 @@
-import CreateProductForm from "@/components/CreateProduct"
-import { getSession } from "@/lib/auth"
-import { redirect } from "next/navigation"
-export default async function NewProductPage() {
-  const session = await getSession()
 
-  if(!session) {
-    redirect("/auth/login")
+import { Suspense } from "react";
+import CreateProductForm from "@/components/CreateProduct";
+import { getSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
+
+export default function NewProductPage() {
+  return (
+    <Suspense fallback={<p className="px-6 py-10">Loading product form...</p>}>
+      <NewProductContent />
+    </Suspense>
+  );
+}
+
+async function NewProductContent() {
+  const session = await getSession();
+
+  if (!session) {
+    redirect("/auth/login");
   }
+
   return (
     <main className="mx-auto max-w-2xl px-6 py-10">
       <h1 className="mb-8 text-3xl font-bold">
@@ -15,5 +27,5 @@ export default async function NewProductPage() {
 
       <CreateProductForm />
     </main>
-  )
+  );
 }

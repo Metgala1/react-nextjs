@@ -10,7 +10,6 @@ import {
     getVideoUrls
 } from "@/lib/supabase/videos";
 
-export const runtime = "nodejs";
 
 export async function POST(request: Request) {
     // Your admin client bypasses RLS, so check auth BEFORE using it:
@@ -90,7 +89,6 @@ export async function POST(request: Request) {
     }
 }
 
-export const dynamic = "force-dynamic";
 
 export async function GET() {
     // Check auth BEFORE using the admin client:

@@ -94,7 +94,7 @@ export default async function ProductDetails(product: Product) {
                         </div>
 
                         {/* Client Component */}
-                        <AddToCartSection productId={product.id} />
+                        <AddToCartSection productName={product.name} productId={product.id} />
                     </div>
                 </div>
             </div>

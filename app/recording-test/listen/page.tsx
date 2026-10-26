@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 
-export const dynamic = "force-dynamic"; // always show the latest recordings
 
 function formatBytes(bytes: number) {
     if (bytes < 1024) return `${bytes} B`;

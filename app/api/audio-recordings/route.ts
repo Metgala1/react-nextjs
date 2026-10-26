@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import {prisma} from "@/lib/prisma";
 
-export const runtime = "nodejs";
 
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -81,8 +80,6 @@ export async function POST(request: Request) {
         );
     }
 }
-
-export const dynamic = "force-dynamic";
 
 export async function GET() {
     try {

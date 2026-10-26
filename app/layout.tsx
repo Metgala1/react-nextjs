@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Header from "@/components/Header";
 import Providers from "./providers";
+import { Suspense } from "react";
 
 const siteUrl =
   process.env.SITE_URL ?? "http://localhost:3000";
@@ -28,7 +29,9 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-950 font-sans">
         <Providers>
-          <Header />
+          <Suspense>
+            <Header />
+          </Suspense>
           {children}
         </Providers>
       </body>

@@ -1,93 +1,107 @@
-// components/AddToCartSection.tsx (Client Component)
+
 "use client";
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { getProductById } from "@/sevices/product.service";
 
 interface AddToCartSectionProps {
-    productId: number;
-    onDelete?: () => Promise<void> | void;
+  productId: number;
+  productName: string;
+  onDelete?: () => Promise<void> | void;
 }
 
-export default async function AddToCartSection({ productId, onDelete }: AddToCartSectionProps) {
-    const [quantity, setQuantity] = useState(1);
-    const [isPending, startTransition] = useTransition();
-    const product = await getProductById(Number(productId))
+export default function AddToCartSection({
+  productId,
+  productName,
+  onDelete,
+}: AddToCartSectionProps) {
+  const [quantity, setQuantity] = useState(1);
+  const [isPending, startTransition] = useTransition();
 
+  const handleDecrement = () => {
+    setQuantity((prev) => Math.max(1, prev - 1));
+  };
 
-    const handleDecrement = () => {
-        setQuantity((prev) => (prev > 1 ? prev - 1 : 1));
-    };
+  const handleIncrement = () => {
+    setQuantity((prev) => prev + 1);
+  };
 
-    const handleIncrement = () => {
-        setQuantity((prev) => prev + 1);
-    };
-
-    const handleAddToCart = () => {
-        // Handle your add to cart logic here (e.g., state management, API call)
-        console.log(`Added product ${productId} with quantity ${quantity} to cart`);
-    };    
-
-    const handleDelete = () => {
-        if (confirm("Are you sure you want to delete this product?")) {
-            startTransition(async () => {
-                if (onDelete) {
-                    await onDelete();
-                }
-            });
-        }
-    };
-
-    return (
-        <div className="space-y-4">
-            {/* Quantity Selector */}
-            <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 p-3 rounded-2xl">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Quantity</span>
-                <div className="flex items-center gap-3">
-                    <button 
-                        onClick={handleDecrement}
-                        className="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer shadow-xs"
-                    >
-                        -
-                    </button>
-                    <span className="text-sm font-bold text-slate-900 w-6 text-center">{quantity}</span>
-                    <button 
-                        onClick={handleIncrement}
-                        className="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer shadow-xs"
-                    >
-                        +
-                    </button>
-                </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
-                <button 
-                    onClick={handleAddToCart}
-                    className="flex-1 bg-black hover:bg-green-500 hover:text-black text-white font-medium text-sm py-3 px-6 rounded-xl shadow-sm transition-colors cursor-pointer"
-                    type="button"
-                    aria-label={`Delete ${product.name}`}
-                >
-                    Add to Cart
-                </button>
-                <Link 
-                    href={`/products/${productId}/edit`} 
-                    className="px-4 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-sm rounded-xl transition-colors cursor-pointer inline-flex items-center justify-center"
-                >
-                    Edit
-                </Link>
-                {onDelete && (
-                    <form action={handleDelete}>
-                    <button 
-                        disabled={isPending}
-                        className="px-4 py-3 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 font-medium text-sm rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                        {isPending ? "Deleting..." : "Delete"}
-                    </button>
-                    </form>
-                )}
-            </div>
-        </div>
+  const handleAddToCart = () => {
+    console.log(
+      `Added product ${productId} with quantity ${quantity} to cart`,
     );
+  };
+
+  const handleDelete = () => {
+    if (!onDelete || !confirm("Are you sure you want to delete this product?")) {
+      return;
+    }
+
+    startTransition(async () => {
+      await onDelete();
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 p-3 rounded-2xl">
+        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          Quantity
+        </span>
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleDecrement}
+            aria-label="Decrease quantity"
+            className="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold"
+          >
+            -
+          </button>
+
+          <span className="text-sm font-bold text-slate-900 w-6 text-center">
+            {quantity}
+          </span>
+
+          <button
+            type="button"
+            onClick={handleIncrement}
+            aria-label="Increase quantity"
+            className="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={handleAddToCart}
+          aria-label={`Add ${productName} to cart`}
+          className="flex-1 bg-black hover:bg-green-500 hover:text-black text-white font-medium text-sm py-3 px-6 rounded-xl"
+        >
+          Add to Cart
+        </button>
+
+        <Link
+          href={`/products/${productId}/edit`}
+          className="px-4 py-3 border border-slate-200 text-slate-700 font-medium text-sm rounded-xl"
+        >
+          Edit
+        </Link>
+
+        {onDelete && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isPending}
+            className="px-4 py-3 border border-rose-200 bg-rose-50 text-rose-600 font-medium text-sm rounded-xl disabled:opacity-50"
+          >
+            {isPending ? "Deleting..." : "Delete"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }

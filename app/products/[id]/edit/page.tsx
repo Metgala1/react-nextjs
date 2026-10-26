@@ -4,24 +4,23 @@ import { getProductById } from "@/sevices/product.service"
 import { redirect } from "next/navigation"
 import notFound from "../../not-found"
 
-export interface Product {
+export interface ProductDTO {
+  id: number;
+  name: string;
+  price: number;
+  category: {
     id: number;
     name: string;
-    price: number;
-    categoryId: number;
-    category?: {
-        id: number;
-        name: string;
-        slug: string;
-    };
-    rating: number;
-    reviewsCount: number;
-    description: string;
-    specs: string[];
-    image: string;
-    quantity: number;
-    createdAt: Date;
-    updatedAt: Date;
+    slug: string;
+  };
+  rating: number;
+  reviewsCount: number;
+  description: string;
+  specs: string[];
+  image: string;
+  quantity: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
@@ -38,7 +37,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         notFound();
     }
 
-    const product: Product = await getProductById(productId);
+    const product: ProductDTO = await getProductById(productId);
 
     if (!product) {
         notFound();

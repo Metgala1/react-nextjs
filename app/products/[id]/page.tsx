@@ -219,7 +219,7 @@ export default async function ProductDetail({ params }: Props) {
                         </div>
 
                         {/* Client Component */}
-                        <AddToCartSection onDelete={deleteProd} productId={product.id} />
+                        <AddToCartSection productName={product.name} productId={product.id} />
                     </div>
                 </div>
             </div>

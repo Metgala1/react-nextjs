@@ -27,6 +27,10 @@ export default async function ProductModal({ params }: Props) {
   const { id } = await params;
   const productId = Number(id);
 
+  if (!Number.isSafeInteger(productId) || productId <= 0) {
+    notFound();
+  }
+
   const product = await prisma.product.findUnique({
     where: {
       id: productId,

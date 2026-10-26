@@ -1,90 +1,72 @@
+
 'use client';
 
-import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '../context/AuthContext.js';
+import { useActionState } from 'react';
+import { loginUser } from '@/actions/login';
+import type { LoginState } from '@/actions/login';
 
-import type { User } from "../context/AuthContext.js"
+const initialState: LoginState = {
+    success: false,
+    message: '',
+};
 
-interface LoginResponse {
-    token: string;
-    user: User;
-    message?: string;
-}
-
-function Login() {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false); // Added loading state
-
-    const router = useRouter();
-    const { login } = useAuth();
-
-    const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-
-        try {
-            const response = await fetch('http://localhost:3000/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
-            });
-
-            const data: LoginResponse = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Login failed. Please check your credentials.');
-            }
-
-            // Pass both token and user to the context login function
-            login(data.token, data.user);
-
-            // Redirect to products page
-            router.push('/products');
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setLoading(false); // Always reset loading state
-        }
-    };
+export default function LoginPage() {
+    const [state, formAction, pending] = useActionState(
+        loginUser,
+        initialState
+    );
 
     return (
-        <div>
+        <main>
             <h1>Login</h1>
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-            <form onSubmit={handleSubmit}>
+
+            {state.message && (
+                <p role="alert" aria-live="polite">
+                    {state.message}
+                </p>
+            )}
+
+            <form action={formAction}>
                 <div>
-                    <label>Email: </label>
-                    <input 
-                        type="email" 
-                        value={email} 
-                        onChange={(e) => setEmail(e.target.value)} 
-                        required 
+                    <label htmlFor="email">Email</label>
+                    <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        aria-invalid={Boolean(state.error?.email)}
                     />
+
+                    {state.error?.email?.map((message) => (
+                        <p key={message} role="alert">
+                            {message}
+                        </p>
+                    ))}
                 </div>
+
                 <div>
-                    <label>Password: </label>
-                    <input 
-                        type="password" 
-                        value={password} 
-                        onChange={(e) => setPassword(e.target.value)} 
-                        required 
+                    <label htmlFor="password">Password</label>
+                    <input
+                        id="password"
+                        name="password"
+                        type="password"
+                        autoComplete="current-password"
+                        required
+                        aria-invalid={Boolean(state.error?.password)}
                     />
+
+                    {state.error?.password?.map((message) => (
+                        <p key={message} role="alert">
+                            {message}
+                        </p>
+                    ))}
                 </div>
-                <button  type="submit" disabled={loading}>
-                    {loading ? 'Logging in...' : 'Submit'}
+
+                <button type="submit" disabled={pending}>
+                    {pending ? 'Logging in...' : 'Log in'}
                 </button>
             </form>
-        </div>
+        </main>
     );
 }
-
-export default Login;
-function redirect(arg0: string) {
-    throw new Error('Function not implemented.');
-}
-

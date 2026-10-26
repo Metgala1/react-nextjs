@@ -5,28 +5,27 @@ import { useActionState } from "react";
 import SubmitButton from "./SubmitButton";
 import { updateProduct } from "@/actions/products.action";
 
-export interface Product {
+export interface ProductDTO {
+  id: number;
+  name: string;
+  price: number;
+  category: {
     id: number;
     name: string;
-    price: number;
-    categoryId: number;
-    category?: {
-        id: number;
-        name: string;
-        slug: string;
-    };
-    rating: number;
-    reviewsCount: number;
-    description: string;
-    specs: string[];
-    image: string;
-    quantity: number;
-    createdAt: Date;
-    updatedAt: Date;
+    slug: string;
+  };
+  rating: number;
+  reviewsCount: number;
+  description: string;
+  specs: string[];
+  image: string;
+  quantity: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface EditProductFormProps {
-    product: Product;
+    product: ProductDTO;
 }
 
 const initialState = {
