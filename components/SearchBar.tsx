@@ -8,12 +8,11 @@ export default function SearchBar() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
-    // Get current values from URL query parameters
-    const currentSearch = searchParams.get("search") ?? ""
-    const currentCategory = searchParams.get("category") ?? "all"
+    // Category comes straight from the URL (single source of truth)
+    const category = searchParams.get("category") ?? "all"
 
-    const [search, setSearch] = useState(currentSearch)
-    const [category, setCategory] = useState(currentCategory)
+    // Search text is local state so typing doesn't push to the URL on every key
+    const [search, setSearch] = useState(searchParams.get("search") ?? "")
 
     // One phrase per tap is what you want for search, so continuous is false
     const {
@@ -36,9 +35,31 @@ export default function SearchBar() {
         ? [spokenText, interimText].filter(Boolean).join(" ")
         : search
 
-    // When a listening session ends, run the search with what was heard
     const wasListeningRef = useRef(false)
 
+    // Update the URL with both parameters
+    const updateUrl = useCallback(
+        (searchQuery: string, categoryFilter: string) => {
+            const params = new URLSearchParams(searchParams.toString())
+
+            const normalizedQuery = searchQuery.trim()
+            if (normalizedQuery) {
+                params.set("search", normalizedQuery)
+            } else {
+                params.delete("search")
+            }
+
+            if (categoryFilter && categoryFilter !== "all") {
+                params.set("category", categoryFilter)
+            } else {
+                params.delete("category")
+            }
+
+            const queryString = params.toString()
+            router.push(queryString ? `/products?${queryString}` : "/products")
+        },
+        [router, searchParams]
+    )
 
     function handleMicClick() {
         if (isListening) {
@@ -48,7 +69,6 @@ export default function SearchBar() {
         }
     }
 
-    // Handle form submit for text search
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault()
         if (isVoiceActive) return
@@ -56,81 +76,46 @@ export default function SearchBar() {
         setSearch("")
     }
 
-    // Handle category change instantly on select change
     function handleCategoryChange(event: React.ChangeEvent<HTMLSelectElement>) {
-        const newCategory = event.target.value
-        setCategory(newCategory)
-        updateUrl(search, newCategory)
+        updateUrl(search, event.target.value)
     }
 
-    // Helper function to update the URL with both parameters
-    const updateUrl = useCallback(
-    (searchQuery: string, categoryFilter: string) => {
-        const params = new URLSearchParams(searchParams.toString());
-
-        const normalizedQuery = searchQuery.trim();
-
-        if (normalizedQuery) {
-            params.set("search", normalizedQuery);
-        } else {
-            params.delete("search");
-        }
-
-        if (categoryFilter && categoryFilter !== "all") {
-            params.set("category", categoryFilter);
-        } else {
-            params.delete("category");
-        }
-
-        const queryString = params.toString();
-
-        router.push(
-            queryString ? `/products?${queryString}` : "/products"
-        );
-    },
-    [router, searchParams]
-    );
-
+    // When a listening session ends, run the search with what was heard
     useEffect(() => {
-    if (status === "listening") {
-        wasListeningRef.current = true;
-        return;
-    }
+        if (status === "listening") {
+            wasListeningRef.current = true
+            return
+        }
 
-    // A failed session must not trigger a search.
-    if (status === "error") {
-        wasListeningRef.current = false;
-        return;
-    }
+        // A failed session must not trigger a search
+        if (status === "error") {
+            wasListeningRef.current = false
+            return
+        }
 
-    // Wait until a session that was listening ends.
-    if (status !== "idle" || !wasListeningRef.current) {
-        return;
-    }
+        // Wait until a session that was listening ends
+        if (status !== "idle" || !wasListeningRef.current) {
+            return
+        }
 
-    wasListeningRef.current = false;
+        wasListeningRef.current = false
 
-    const spoken = spokenText.trim();
+        const spoken = spokenText.trim()
+        if (!spoken) {
+            clearTranscript()
+            return
+        }
 
-    if (!spoken) {
-        clearTranscript();
-        return;
-    }
-
-    setSearch(spoken);
-    updateUrl(spoken, category);
-    clearTranscript();
-    
-    }, [
-    status,
-    spokenText,
-    category,
-    updateUrl,
-    clearTranscript,
-    ]);
+        setSearch(spoken)
+        updateUrl(spoken, category)
+        clearTranscript()
+    }, [status, spokenText, category, updateUrl, clearTranscript])
 
     return (
-        <form onSubmit={handleSubmit} className="flex-1 max-w-xl mx-4 hidden sm:flex items-center gap-2">
+        <form
+            onSubmit={handleSubmit}
+            className="flex-1 max-w-xl mx-4 hidden sm:flex items-center gap-2"
+        >
             {/* Category Dropdown Filter */}
             <div className="shrink-0">
                 <select

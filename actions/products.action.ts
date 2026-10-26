@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { uploadProductImage, deleteProductImage } from "@/lib/supabase/product-images";
+import { updateTag } from "next/cache";
 
 // Small shared helper so both actions parse specs the same way.
 function parseSpecs(formData: FormData): string[] {
@@ -269,6 +270,7 @@ export async function updateProduct(
   revalidatePath(`/products`);
   revalidatePath(`/test`)
   revalidatePath(`/products/${id}`);
+  updateTag("product")
 
   redirect(`/products/${id}`);
 }

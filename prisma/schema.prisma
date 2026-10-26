@@ -29,6 +29,8 @@ model Product {
 
   categoryId   Int
   category     Category @relation(fields: [categoryId], references: [id])
+
+  @@index([rating])
 }
 
 enum UserRole {

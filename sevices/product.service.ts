@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/app/generated/prisma/client";
 import { AppError } from "@/lib/errors";
+import { cacheLife , cacheTag } from "next/cache";
 
 const productWithCategory = {
   include: {
@@ -81,6 +82,10 @@ export async function getProducts(
   category?: string,
   page?: string
 ) {
+   "use cache";
+
+   cacheLife("minutes")
+   cacheTag("products")
   const pageSize = 4;
   const currentPage = Math.max(Number(page) || 1, 1);
   const skip = (currentPage - 1) * pageSize;
@@ -162,6 +167,10 @@ export async function getProductById(id: number): Promise<ProductDTO> {
 }
 
 export async function getFeaturedProducts(): Promise<Product[]> {
+  "use cache";
+
+  cacheLife("minutes")
+  cacheTag("products")
   return prisma.product.findMany({
     take: 4,
     include: {

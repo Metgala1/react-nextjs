@@ -3,15 +3,18 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { getProductById } from "@/sevices/product.service";
 
 interface AddToCartSectionProps {
     productId: number;
     onDelete?: () => Promise<void> | void;
 }
 
-export default function AddToCartSection({ productId, onDelete }: AddToCartSectionProps) {
+export default async function AddToCartSection({ productId, onDelete }: AddToCartSectionProps) {
     const [quantity, setQuantity] = useState(1);
     const [isPending, startTransition] = useTransition();
+    const product = await getProductById(Number(productId))
+
 
     const handleDecrement = () => {
         setQuantity((prev) => (prev > 1 ? prev - 1 : 1));
@@ -63,6 +66,8 @@ export default function AddToCartSection({ productId, onDelete }: AddToCartSecti
                 <button 
                     onClick={handleAddToCart}
                     className="flex-1 bg-black hover:bg-green-500 hover:text-black text-white font-medium text-sm py-3 px-6 rounded-xl shadow-sm transition-colors cursor-pointer"
+                    type="button"
+                    aria-label={`Delete ${product.name}`}
                 >
                     Add to Cart
                 </button>
